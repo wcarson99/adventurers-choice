@@ -4,10 +4,9 @@
 
 * **Core Experience:** Cooperative party adventure game centered on collaborative, attribute-driven mini-games, emphasizing multiple viable paths to survival.
 * **Theme:** **Pre-Industrial Fantasy** (D&D style, low-magic resource feel with Tech-Magic hybrids, focusing on scarcity and documentation).
-* **Platform:** Browser/Desktop (Inspired by Puzzle Pirates).
 * **Player Count:** Designed for parties of 3-6 members.
 * **Attribute Integration:** All six D&D attributes (STR, DEX, CON, INT, WIS, CHA) provide distinct, non-redundant mechanical value in every major mini-game.
-* **Game Modes:** Supports **Campaign Mode** and **Roguelike Mode** (featuring the **Triage Choice** recovery constraint).
+* **Game Mode (MVP Focus):** Supports **Roguelike Mode** only.
 
 ---
 
@@ -15,92 +14,62 @@
 
 ### 🧭 Core Adventure Loop (The Daily Loop)
 
-The game progresses in cycles representing an Adventuring Day.
-
 | Phase | Description | Primary Mini-Game Used |
 | :--- | :--- | :--- |
-| **1. Preparation** | Party selects and executes Downtime projects (crafting, research, training) to prepare for the day. | **The Preparation Phase** |
-| **2. Adventure** | Party selects a destination and spends time/resources to travel between nodes on the World Map, managing survival meters. | **The Survival Ledger** |
-| **3. Encounter** | Party resolves the challenge at the destination node (Combat, Social, or Obstacle). | **Positional Skirmish, Court of Whispers,** or **The Gauntlet** |
-| **4. Recovery** | Party restores resources. This phase includes the high-stakes **Triage Choice** in Roguelike Mode. | **The Preparation Phase** (Healing Focus) |
+| **1. Preparation** | Party selects and executes Downtime projects (crafting, training, **spending AP**). | **The Preparation Phase** |
+| **2. Adventure** | Party selects a destination and spends time/resources to travel. | **The Survival Ledger** |
+| **3. Encounter** | Party resolves the challenge at the destination node, **earning AP**. | **Positional Skirmish, Court of Whispers,** or **The Gauntlet** |
+| **4. Recovery** | Party restores resources (includes mode-specific rules). | **The Preparation Phase** (Healing Focus) |
 
-### 🎲 Mini-Game Catalogue (Turn-Based)
+### 🏆 Progression and Economy (MVP)
 
-#### 1. Positional Skirmish (Combat)
-* **Core Challenge:** Outmaneuvering the enemy on a 3x3 grid by managing player position (front/back row) and resource tokens to execute turn-based attacks.
-* **Primary Focus:** STR (Melee), DEX (Ranged/Movement).
-
-#### 2. Court of Whispers (Social/Negotiation)
-* **Core Challenge:** Convincing an NPC via debate and resource management (Favor/Trust) to achieve a desired outcome without violence. Social elements cover buying/trading (short-term) and reputation building (long-term).
-* **Primary Focus:** CHA (Influence), WIS (Insight).
-
-#### 3. The Gauntlet (Trap Dungeon/Obstacle Course)
-* **Core Challenge:** Navigating a hazardous, time-pressured path by finding and disabling threats and bypassing obstacles.
-* **Primary Focus:** DEX (Evasion), WIS (Detection).
-
-#### 4. The Preparation Phase (Downtime/Resource Investment)
-* **Core Challenge:** Optimally allocating limited time/action points to cooperative projects that upgrade party stats/gear.
-* **Primary Focus:** INT (Research), STR (Labor), CHA (Recruitment).
-
-#### 5. The Survival Ledger (Travel/Exploration/Gathering)
-* **Core Challenge:** Balancing dynamic survival meters (Food, Water, Pace) against random environmental demands by spending inventory, gathering, or researching.
-* **Primary Focus:** WIS (Gathering), CON (Endurance), INT (Research).
-
----
-
-## 📈 Skill Progression and Archetypes
-
-Skills are leveled up by successfully using their corresponding attribute in the relevant mini-game. This creates natural progression tracks leading to specialized Archetypes.
-
-| Progression Track | Associated Mini-Game(s) | Primary Attributes | Example Skills Earned |
-| :--- | :--- | :--- | :--- |
-| **I. Combat & Physicality** | **Positional Skirmish** | **STR** & **DEX** | Athletics, Weapons Mastery, Acrobatics. |
-| **II. Social & Trade** | **Court of Whispers** | **CHA** & **WIS** | Persuasion, Deception, Insight. |
-| **III. Survival & Exploration** | **Survival Ledger** | **WIS** & **CON** | Survival, Medicine, Endurance Training. |
-| **IV. Research & Crafting** | **Preparation Phase** | **INT** & **STR** | Arcana/Linguistics, Tool Proficiency, Engineering. |
-| **V. Trap & Stealth** | **The Gauntlet** | **DEX** & **INT** | Sleight of Hand, Investigation, Stealth. |
-
----
-
-## ⚙️ Implementation Approach: Minimal Viable Product (MVP)
-
-The MVP goal is to prove the core fun of **collaborative, turn-based, attribute-driven puzzling**.
-
-#### Recommended MVP: The Gauntlet (Trap Dungeon)
-
-The Gauntlet is the ideal starting point because it forces all six attributes into an asymmetrical, time-pressured, collaborative puzzle, proving the core mechanic with minimal visual assets.
-
-#### MVP Feature Checklist
-| Component | Priority | Description |
+| Component | Rule/Constraint | Rationale |
 | :--- | :--- | :--- |
-| **I. Core Framework** | **Must Have** | Basic 3-6 player lobby, turn structure, and a functional player communication system (chat/voice). |
-| **II. Character Definition** | **Must Have** | Simple character sheet displaying **fixed Attribute Scores** (STR, DEX, etc.). |
-| **III. Core Loop (Minimum)** | **Must Have** | **Start Game $\rightarrow$ Mini-Game $\rightarrow$ Success/Fail $\rightarrow$ End Game.** (Minimal loop). |
-| **IV. Mini-Game Implementation** | **Must Have** | **The Gauntlet** fully implemented with all six attribute modifiers integrated (DEX slows timer, WIS reveals traps, CON provides stamina pool). |
-| **V. Basic Failure State** | *Should Have* | End screen showing "Party Wiped" message and final run time/score. |
+| **Attribute Scores (STR-CHA)**| Randomly generated with a **sum of 18** and a **maximum of 5**. | Ensures randomized character builds and specialization. |
+| **Gold** | **Individual Pool** (Tracked on character). **1 Unit of Gold = 0.5 lbs.** | Used exclusively for **Trade, Supplies, and Reviving** fallen allies. Contributes to individual Encumbrance. |
+| **Resource Economy Focus** | **Gold (Wealth/Trade)** is separate from **AP (Power/Progression)**. | Creates two clear, distinct economic loops for player decision-making. |
+
+### 🌳 Progression System: Consumable Attribute Points (AP)
+
+* **Acquisition:** APs are earned individually, based on the *successful use* of the corresponding core attribute mechanic during an Encounter. (e.g., Using **Obstacle Forcing** earns STR AP).
+* **Spending:** AP is consumed during the **Preparation Phase** to permanently improve the character.
+
+| Progression Goal | Resource Used | Cost Structure | Prerequisite Gate |
+| :--- | :--- | :--- | :--- |
+| **Increase Attribute Score** | Specific Attribute AP (e.g., STR AP) | **Progressive Cost:** The number of AP consumed to gain +1 to the attribute (5 $\rightarrow$ 10 $\rightarrow$ 15 $\rightarrow$ 20). | None (other than maxing at 5). |
+| **Unlock Tier 1 Skill** | Specific Attribute AP (e.g., STR AP) | **Flat Cost:** **5 AP** of the corresponding attribute. | Must have the **Attribute Score $\ge 3$**. |
+
+### 🧍 Character Foundation & Encumbrance
+
+| Component | Rule/Starting Value | Rationale |
+| :--- | :--- | :--- |
+| **Tier 1 Skill Prereq** | Must have a score of **3** in the corresponding attribute to unlock and learn Tier 1 Skills. | Creates a meaningful specialization threshold. |
+| **HP / Stamina** | Base 5 + **CON Score**. | CON is the central survival/action resource. |
+| **Encumbrance (Gold/Items)** | Weight $>$ **STR $\times 5$** (Encumbered), Weight $>$ **STR $\times 10$** (Heavily Encumbered). | Forces STR characters to be the primary carriers of wealth (Gold) and supplies. |
+
+---
+
+## 💥 The Gauntlet: MVP Core Mechanics & Tier 1 Skills
+
+The MVP skill progression is limited to the Core Mechanic (active) and a single Tier 1 Skill (passive/utility), both costing **5 AP** to unlock if the attribute score is $\ge 3$.
+
+| Attribute | Core Mechanic (Active) | Tier 1 Skill (Passive/Reactionary) | Primary Role & Cost to Unlock |
+| :--- | :--- | :--- | :--- |
+| **Strength (STR)** | **Obstacle Forcing (Move/Destroy)** | **Controlled Descent:** Cost for **Obstacle Forcing** is reduced by **-1**. | **5 STR AP** |
+| **Dexterity (DEX)** | **Free Step (Movement Economy)** | **Acrobatics Training:** Move **diagonally** on the grid for the cost of a single square. | **5 DEX AP** |
+| **Constitution (CON)** | **Resilience Buffer (Heal/Prevent)** | **Quick Recovery:** Amount restored by **Resilience Buffer** is increased by **+1**. | **5 CON AP** |
+| **Intelligence (INT)** | **Temporary Modification (Saboteur)** | **Efficient Tool Use:** Stamina cost for **Temporary Modification** is reduced by **-1**. | **5 INT AP** |
+| **Wisdom (WIS)** | **Situational Awareness (Environmental)** | **Critical Spotting:** Area of effect for "Near" information from **Situational Awareness** is increased by **+1 square**. | **5 WIS AP** |
+| **Charisma (CHA)** | **Positional Rally (Temporary Buff)** | **Inspiring Presence:** Duration of **Positional Rally** boost is increased by **+1 turn**. | **5 CHA AP** |
 
 ---
 
 ### Current Decisions Log
 
-### [Nov 27, 2025 - Game Name]
-* **Decision:** The placeholder name is **The Adventurer's Choice**.
-* **Rationale:** The name prioritizes clarity and emphasizes player agency and strategic decision-making within the core loop.
+### [Nov 29, 2025 - Final Progression Model]
+* **Decision:** Progression is driven entirely by **Consumable Attribute Points (AP)**. The AXP and Lore Fragments pools are removed.
+* **Decision:** APs are earned individually based on the actions successfully taken during an encounter (e.g., using STR abilities earns STR AP).
+* **Decision:** APs are spent during the **Preparation Phase** to either **increase a base attribute score** (progressive cost: 5, 10, 15, 20 AP) or **unlock a Tier 1 skill** (flat cost of 5 AP).
+* **Rationale:** Creates the simplest, most transparent progression model that directly ties action to permanent reward, providing maximum player agency over their character's specialization.
 
-### [Nov 27, 2025 - Game Viability]
-* **Decision:** The game is fundamentally viable and fun without traditional combat due to the strength of the collaborative puzzle structure.
-
-### [Nov 27, 2025 - Implementation]
-* **Decision:** The **MVP Focus** will be on the **The Gauntlet (Trap Dungeon)** mini-game.
-
-### [Nov 27, 2025 - Progression]
-* **Decision:** Skills are mapped to their progression track and associated mini-game, ensuring focused character growth.
-
----
-
-**Now that the game's identity and structure are complete, we can focus on the progression tracks. Which Archetype progression track should we detail next, by defining three unique starting skills (or skill trees) that players can immediately identify with?**
-
-1.  **The Combatant:** (STR/DEX focus)
-2.  **The Diplomat/Trader:** (CHA/WIS focus)
-3.  **The Scout/Rogue:** (DEX/INT focus)
-4.  **The Crafter/Scholar:** (INT/STR focus)
+**Next Step:** Let's define the AP gain rate for the MVP. **How many AP tokens should a player gain from successfully using a Core Attribute Mechanic (e.g., using 'Obstacle Forcing' once in The Gauntlet)?** (We must be careful to keep this low, as the cost for a Tier 1 skill is only 5 AP.)
