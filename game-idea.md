@@ -1,4 +1,4 @@
-# The Adventurer's Choice
+# Game Name (TBD)
 
 ## 🕹️ Design Pillars
 
@@ -27,7 +27,7 @@ The game uses two resource-linked time scales: **Days** (narrative progress/majo
 #### Survival Constraints
 
 * **Food Consumption (Baseline):** **1 Unit of Food** supports **1 Character for 1 Day**. All macro-activities consume 1 Food per character.
-* **Fatigue Mechanic (Final):** **1 stack of Fatigue** is gained for every **4 Units of Food** consumed by a single character. This aligns the penalty directly with resource expenditure (e.g., 4 days of travel or 40 encounter turns).
+* **Fatigue Mechanic (Final):** **1 stack of Fatigue** is gained for every **4 Units of Food** consumed by a single character.
     * **Penalty:** Each stack of Fatigue imposes a flat **-1 penalty to *all* Attribute Checks** (STR, DEX, CON, INT, WIS, CHA).
 
 #### Failure Condition: The Starvation Clock
@@ -52,11 +52,14 @@ The game uses two resource-linked time scales: **Days** (narrative progress/majo
 
 * **Stamina Restoration:** Consuming **1 Unit of Food** counts as an action during an Encounter and restores **+5 Stamina**.
 
-### 🗺️ Town and Overland Flow
+### 🗺️ Town and Overland Flow (The Core Loop)
 
+* **Core Loop:** **Party Creation** $\rightarrow$ **Town** (Job Board/Store) $\rightarrow$ **Travel** (Day Cost, Random Encounter Check) $\rightarrow$ **Destination/Mission Completion** $\rightarrow$ **Return to Town**.
 * **Initial State:** Party starts in a **Town Node**, where they can purchase resources and accept missions.
 * **Town Actions:** Town actions (e.g., resting, crafting, researching) cost **1 Day's Activity** (1 Food per character).
 * **Travel:** Missions involve **Travel** to destinations on a **Procedurally Generated Map**. The estimated travel time (X Days) defines the minimum required Food resource.
+* **Random Encounters:** Occur during Travel, triggering a small, single-objective Gauntlet Encounter (Obstacle, Trap, Combat, Trade, etc.).
+* **Mission Reward Structure:** **AP is rewarded immediately** upon completing the destination objective. **Gold is rewarded only upon returning to the Quest Giver node.** The gold reward persists until collected.
 
 ### Encumbrance (Weight-Based Penalty)
 
@@ -68,8 +71,25 @@ The game uses two resource-linked time scales: **Days** (narrative progress/majo
 
 ### Mini-Game Structure (The Gauntlet)
 
-* **Structure:** **Node Exploration** on a small, tactical grid (e.g., $8 \times 8$).
+* **Structure:** **Node Exploration** on a small, rectangular tactical grid ($8 \times 8$).
+* **Turn Resolution:** **Atomic.** Player pre-commits all character actions, which then execute sequentially in the chosen order. Conflicts result in a failed action but a Food cost and partial penalty (no Stamina refund).
 * **Objective:** The party must move strategically to activate 3-4 specific nodes (puzzles, switches, objectives) to complete the encounter, forcing interaction with all parts of the grid.
+* **Pacing Constraint:** The Gauntlet has a soft cap of **40 Total Party Actions**. After turn 20, all Stamina costs increase by +1. After turn 30, all Attribute Checks suffer a -1 penalty.
+
+#### Visibility and Fog of War (FoW)
+
+* **Visible Range:** Extends **3 squares** (manhattan distance) from the edge of the tile of any character. Allows full interaction.
+* **Previously Seen (Grayed):** Shows geometry but does not allow object targeting or Attribute Checks.
+* **Obscured (Dark):** Completely blocked/unvisited.
+* **WIS Interaction:** **WIS (Scout Path)** can temporarily make a *Previously Seen* area *Visible* for 1 turn.
+
+#### Fatigue Recovery
+
+| Recovery Mechanic | Constraint/Cost | Effect |
+| :--- | :--- | :--- |
+| **Simple Rest** | **1 Day** (1 Food/character) | Removes **1 stack of Fatigue** from **all characters**. |
+| **Intensive Rest**| **2 Days** (2 Food/character) | Removes **3 stacks of Fatigue** from **all characters**. |
+| **Respite (Town Only)** | **3 Days** (3 Food/character) | Removes **all stacks of Fatigue** from all characters and allows the party to change their **Tier 1 Skill** selection. |
 
 ### 🌳 Progression System: Consumable Attribute Points (AP)
 
@@ -78,48 +98,81 @@ The game uses two resource-linked time scales: **Days** (narrative progress/majo
 | **Increase Attribute Score** | Specific Attribute AP | **Progressive Cost:** 5 $\rightarrow$ 10 $\rightarrow$ 15 $\rightarrow$ 20 AP to gain +1. | None (other than maxing at 5). |
 | **Unlock Tier 1 Skill** | Specific Attribute AP | **Flat Cost:** **5 AP** of the corresponding attribute. | Must have the **Attribute Score $\ge 3$**. |
 
-### 💥 The Gauntlet: MVP Core Mechanics & Tier 1 Skills
+### 💥 The Gauntlet: MVP Core Mechanics & Grid Elements
 
-| Attribute | Core Mechanic (Active) | Tier 1 Skill (Passive/Reactionary) | Primary Role & Cost to Unlock |
+#### Core Grid Interactions
+
+* **Move Object:** Handled by **STR** (Obstacle Forcing).
+* **Interact/Activate:** Handled by **DEX** (Free Step/Evasion) and **INT** (Temporary Modification).
+* **Tile Modification:** Handled by **WIS** (Scouting) and **CON** (Fortification).
+
+| Attribute | Core Mechanic (Active) | Gauntlet Purpose |
+| :--- | :--- | :--- |
+| **Strength (STR)** | **Obstacle Forcing** | Push, pull, or destroy heavy/damaged grid objects (Move Object interaction). |
+| **Dexterity (DEX)** | **Free Step** | Take one extra movement square per turn as a **free action** (Movement Economy/Evasion). |
+| **Constitution (CON)** | **Resilience Buffer** | **Fortify Tile** to mitigate environmental damage and penalties for allies. |
+| **Intelligence (INT)** | **Temporary Modification** | **Precise Activation** of mechanism nodes, temporarily locking their state for sequence puzzles (Interact/Activate interaction). |
+| **Wisdom (WIS)** | **Situational Awareness** | **Scout Path** to temporarily reveal hidden hazards, traps, or safe tiles on the grid (Tile Modification/Scouting). |
+| **Charisma (CHA)** | **Positional Rally** | **Inspire/Rally** adjacent allies, granting them a temporary bonus to their next Attribute Check. |
+
+#### Hazard and Encounter Templates
+
+| Name | Focus Attribute | Core Interaction/Puzzle | Fail State |
 | :--- | :--- | :--- | :--- |
-| **Strength (STR)** | **Obstacle Forcing (Move/Destroy)** | **Controlled Descent:** Cost for **Obstacle Forcing** is reduced by **-1**. | **5 STR AP**. |
-| **Dexterity (DEX)** | **Free Step (Movement Economy)** | **Acrobatics Training:** Move **diagonally** on the grid for the cost of a single square. | **5 DEX AP**. |
-| **Constitution (CON)** | **Resilience Buffer (Heal/Prevent)** | **Quick Recovery:** Amount restored by **Resilience Buffer** is increased by **+1**. | **5 CON AP**. |
-| **Intelligence (INT)** | **Temporary Modification (Saboteur)** | **Efficient Tool Use:** Stamina cost for **Temporary Modification** is reduced by **-1**. | **5 INT AP**. |
-| **Wisdom (WIS)** | **Situational Awareness (Environmental)** | **Critical Spotting:** Area of effect for "Near" information from **Situational Awareness** is increased by **+1 square**. | **5 WIS AP**. |
-| **Charisma (CHA)** | **Positional Rally (Temporary Buff)** | **Inspiring Presence:** Duration of **Positional Rally** boost is increased by **+1 turn**. | **5 CHA AP**. |
+| **Collapsing Archway** | STR | **Moveable Objects:** Push debris (Size 3-5 Pillar) to clear a path (STR Check). | Minor damage and 1 stack of Fatigue. |
+| **Hidden Pressure Plate**| DEX | **Trap Tile:** **DEX Check** (Evasion) to negate damage/Immobilized condition upon activation. | 2 HP Damage and Immobilized condition. |
+| **Derelict Mechanism Bypass**| INT | **Static Mechanisms:** Use **INT (Temporary Modification)** to lock switch states in sequence. | Stamina Drain/Feedback Damage. |
+| **Toxic Gas Leak** | CON | **Ambient Field:** Use **CON (Fortify Tile)** to protect allies from end-of-turn **Toxic Debuff** and Stamina Drain. | Debuff Overload leads to Irreducible HP Loss. |
+| **The Grindstone Floor** | STR/INT | **Dynamic Floor Tiles:** Use **STR** to brace against push or **INT** to lock the regulator. | Character/Object pushed into a wall suffers Crush Damage. |
+| **State-Cycling Path** | WIS/CON/DEX | **Dynamic Floor Tiles:** **WIS** predicts the cycle, **DEX** moves efficiently, **CON** fortifies dangerous tiles. | Pit Immobilization and Irreducible HP loss risk. |
+| **Negotiation Lock** | CHA | **Positional Buff:** Use **CHA (Positional Rally)** to reduce the TN of the final Persuasion Check by ensuring party members are close. | Alarm triggered, +1 stack of Fatigue to all. |
 
-#### Encounter Template Examples
+#### Procedural Generation Mechanisms (PCG)
 
-| Type | Name | Attribute Check | Fail State | Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| **Obstacle (STR)** | Collapsing Archway | **STR Check** (Obstacle Forcing) | Minor damage and 1 stack of Fatigue to the acting character. | Tests team-based clearing/stabilization. |
-| **Trap (DEX)** | Hidden Pressure Plate | **DEX Check** (Free Step) | Inflicts moderate damage and Encumbers the character for 2 turns. | Tests scouting and careful movement. |
+* **1. The "Start-to-Goal Reverse Scramble":** Used for generating **Moveable Object** and **Sequential Activation** puzzles. Starts at the solution state and reverses a series of valid moves to create the initial puzzle state, guaranteeing solvability.
+* **2. The "Guaranteed Safe Path Time Window":** Used for generating **Dynamic Floor Tile** hazards. Ensures the state cycles are aligned such that a perfect sequence of **DEX Free Steps** can cross the path without damage, proving the existence of a solution solvable via information (**WIS**) and speed (**DEX**).
+
+### 🏆 Victory Conditions (Tiered Modes)
+
+| Mode Name | Victory Condition (Missions) | Estimated Real-World Duration | AP Goal |
+| :--- | :--- | :--- | :--- |
+| **Quick Run** | **10 Missions** | $\approx 3.3$ hours | Testing character builds/gaining early AP. |
+| **Normal Run (Default)** | **30 Missions** | $\approx 10$ hours | Full experience run, allowing Tier 1 skill unlocks. (MVP Focus) |
+| **Full Run (Expert)** | **100 Missions** | $\approx 33.3$ hours | Endurance run, high-level attribute growth. |
+
+---
+
+## 🎨 Theme and Aesthetic
+
+**(Details to be defined in subsequent brainstorming.)**
 
 ---
 
 ### Current Decisions Log (Complete Chronology)
 
-### [Nov 29, 2025 - MVP Scope & Progression]
-* **Decision:** Core mechanics defined: **Attribute Skill Tree**, **Consumable AP**, and **Tier 1 Skills** for all six attributes. **Archetypes are removed**.
+... *(Log truncated for brevity, new entries below)*
 
-### [Nov 29, 2025 - Resource Ownership & Revival]
-* **Decision:** **Gold** is an **Individual Pool** contributing to personal **Encumbrance**. Revival is backlogged to the **Tier 3 CON skill**.
+### [Nov 30, 2025 - Mission Reward Structure]
+* **Decision:** **AP is rewarded immediately** upon completing the destination objective. **Gold is rewarded only upon returning to the Quest Giver node.** The gold reward persists until collected.
 
-### [Nov 30, 2025 - Finalized Economy and Tactical Use]
-* **Decision:** **1 Gold = 4 Units of Food.** (High Scarcity baseline confirmed).
-* **Decision:** **1 Unit of Food restores +5 Stamina** when consumed as an action during an Encounter.
+### [Nov 30, 2025 - Core Gauntlet Mechanics (All 6 Attributes)]
+* **Decision:** All six attributes are now mapped to unique, non-combat, cooperative grid interactions.
 
-### [Nov 30, 2025 - Finalized Pacing and Fatigue]
-* **Decision:** **Travel (Node Move)** and **Downtime** cost **1 Day** (1 Food per character).
-* **Decision:** **Encounter Actions** cost **0.1 Food per character** (micro-costing).
-* **Decision:** **Fatigue** is gained for every **4 Units of Food** consumed by a single character.
+### [Nov 30, 2025 - Visibility and Fog of War]
+* **Decision:** The Gauntlet uses a three-state Fog of War: **Visible (3 squares range)**, **Previously Seen (Grayed)**, and **Obscured (Dark)**.
 
-### [Nov 30, 2025 - Encounter Structure]
-* **Decision:** **Mini-Game Structure** is **Node Exploration** on a small tactical grid ($8 \times 8$).
-* **Decision:** MVP includes a **STR Obstacle (Collapsing Archway)** and a **DEX Trap (Hidden Pressure Plate)** as initial template examples.
+### [Nov 30, 2025 - Atomic Turn Resolution]
+* **Decision:** Gauntlet turn resolution will be **Atomic:** Player pre-commits all character actions, which then execute sequentially.
 
-### [Nov 30, 2025 - Failure Condition (Unifying States)]
-* **Decision:** The separate **Exhaustion Damage** track is **removed** to simplify state complexity.
-* **Decision:** **Fatigue** is redefined as the general mechanical penalty: **Each stack of Fatigue imposes a flat -1 penalty to *all* Attribute Checks**.
-* **Decision:** The **Starvation Clock** penalty is tied to Fatigue: In the Starvation State, ending a turn with **0 Stamina** grants **1 stack of Fatigue**. If a character gains a Fatigue stack while already at **5 or more stacks**, they suffer **-1 Irreducible HP** loss.
+### [Nov 30, 2025 - Fatigue Recovery]
+* **Decision:** Defined tiered recovery mechanics (**Simple, Intensive, Respite**) that cost **Days** and **Food** to remove Fatigue stacks.
+
+### [Nov 30, 2025 - Hazard Definitions]
+* **Decision:** Defined three core dynamic hazards: **Toxic Gas Leak (CON)**, **The Grindstone Floor (STR/INT)**, and **The State-Cycling Path (WIS/DEX/CON)**.
+
+### [Nov 30, 2025 - Core Puzzle Elements]
+* **Decision:** Refined the core grid elements into four categories: **Moveable Objects (STR)**, **Static Mechanisms (INT)**, **Dynamic Floor Tiles (WIS/CON)**, and **Trap/Hazard Tiles (DEX/WIS)**.
+
+### [Nov 30, 2025 - Procedural Generation (PCG)]
+* **Decision:** Defined two core generation mechanisms: **Start-to-Goal Reverse Scramble** (for positional puzzles) and **Guaranteed Safe Path Time Window** (for time-based puzzles), ensuring all generated Gauntlets are solvable.
+* **Open Questions:** What is the visual theme and aesthetic of the game? What is the gold cost/AP cost of non-essential items?
