@@ -201,11 +201,42 @@ type Action =
 
 ## Mini-Game: The Gauntlet (MVP Focus)
 
+### Structure: Daily Loop Within The Gauntlet
+
+The Gauntlet is not a single encounter, but a sequence of days. Each day follows this loop:
+
+```
+while not won() and not lost():
+  Day Loop:
+    1. Prepare Phase
+       - Party selects and executes Downtime projects
+       - Uses: Preparation Phase mini-game
+       - Focus: INT (Research), STR (Labor), CHA (Recruitment)
+    
+    2. Travel Phase
+       - Party moves through the gauntlet path
+       - Uses: Survival Ledger mini-game
+       - Focus: WIS (Gathering), CON (Endurance), INT (Research)
+       - Manages survival meters (Food, Water, Pace)
+    
+    3. Encounter Phase
+       - Party resolves trap/obstacle challenge
+       - Uses: Core Gauntlet mechanics (grid-based trap solving)
+       - Focus: DEX (Evasion), WIS (Detection), all attributes
+    
+    4. Recovery Phase
+       - Party restores resources
+       - Uses: Preparation Phase mini-game (Healing Focus)
+       - May include Triage Choice in Roguelike Mode
+```
+
 ### Requirements
 
 - **Grid-Based**: Characters and traps exist on a grid (exact dimensions TBD)
 - **Turn-Based**: Player selects actions for party members
-- **Time Pressure**: Some Gauntlets have turn limits
+- **Time Pressure**: Some Gauntlets have turn limits (day limits or turn limits within encounters)
+- **Daily Loop**: Each day cycles through Prepare → Travel → Encounter → Recover
+- **State Machine**: Gauntlet tracks current phase and day number
 - **Attribute Integration**: All six attributes provide mechanical value:
   - **STR**: Force-based solutions (breaking obstacles)
   - **DEX**: Movement speed, trap disarming, evasion
@@ -216,8 +247,8 @@ type Action =
 
 ### Win/Loss Conditions
 
-- **Win**: Reach end of Gauntlet within turn limit (if applicable)
-- **Loss**: Party wipe (all characters incapacitated) OR turn limit exceeded
+- **Win**: Complete The Gauntlet (reach end) within day/turn limit (if applicable)
+- **Loss**: Party wipe (all characters incapacitated) OR day/turn limit exceeded
 
 ## Testing Strategy (MVP)
 
