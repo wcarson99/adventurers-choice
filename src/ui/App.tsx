@@ -1,13 +1,41 @@
-import React from 'react'
+
+import React from 'react';
+import { GameProvider, useGame } from '../game-engine/GameState';
+import SplashScreen from './pages/SplashScreen';
+import CharacterCreation from './pages/CharacterCreation';
+import TownHub from './pages/TownHub';
+import GeneralStore from './pages/GeneralStore';
+import JobBoard from './pages/JobBoard';
+import MissionView from './pages/MissionView';
+
+const GameViewSwitcher: React.FC = () => {
+  const { currentView } = useGame();
+
+  switch (currentView) {
+    case 'SPLASH':
+      return <SplashScreen />;
+    case 'CHARACTER_CREATION':
+      return <CharacterCreation />;
+    case 'TOWN':
+      return <TownHub />;
+    case 'STORE':
+      return <GeneralStore />;
+    case 'JOB_BOARD':
+      return <JobBoard />;
+    case 'MISSION':
+      return <MissionView />;
+    default:
+      return <div>Unknown View</div>;
+  }
+};
 
 function App() {
   return (
-    <div>
-      <h1>The Adventurer's Choice</h1>
-      <p>Game coming soon...</p>
-    </div>
-  )
+    <GameProvider>
+      <GameViewSwitcher />
+    </GameProvider>
+  );
 }
 
-export default App
+export default App;
 

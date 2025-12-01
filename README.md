@@ -15,27 +15,31 @@ A cooperative party adventure game centered on collaborative, attribute-driven m
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 
 ### Setup
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
 2. Start development server:
+
 ```bash
 npm run dev
 ```
 
 3. Run E2E tests:
+
 ```bash
 npm run test:e2e
 ```
 
 4. Run unit tests (if added):
+
 ```bash
 npm run test:unit
 ```
@@ -56,8 +60,7 @@ See `BACKLOG.md` for prioritized vertical slices.
 
 ## Documentation
 
-- `ARCHITECTURE.md` - Technical architecture and design decisions
-- `BACKLOG.md` - Prioritized list of vertical slices
-- `game-idea.md` - Game design document
-- `system-prompt.md` - Development guidelines
-
+- **[Game Design](docs/DESIGN.md)**: Detailed game mechanics, theme, and design pillars.
+- **[Architecture](docs/ARCHITECTURE.md)**: Technical stack, ECS structure, and code organization.
+- **[Backlog](docs/BACKLOG.md)**: Development roadmap and vertical slices.
+- **[Decisions](docs/DECISIONS.md)**: Architecture Decision Records (ADR) log.
