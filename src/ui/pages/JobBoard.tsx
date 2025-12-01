@@ -29,14 +29,16 @@ const MOCK_MISSIONS: Mission[] = [
 ];
 
 const JobBoard: React.FC = () => {
-  const { setView, startMission, food } = useGame();
+  const { setView, startMission, getTotalFood } = useGame();
 
   const handleAccept = (mission: Mission) => {
     const foodCost = mission.days * 4; // 4 characters
-    if (food >= foodCost) {
+    const totalFood = getTotalFood();
+    
+    if (totalFood >= foodCost) {
       startMission(mission);
     } else {
-      alert(`Not enough food! You need ${foodCost} food for this ${mission.days}-day mission.`);
+      alert(`Not enough food! You need ${foodCost} food for this ${mission.days}-day mission. You have ${totalFood}.`);
     }
   };
 

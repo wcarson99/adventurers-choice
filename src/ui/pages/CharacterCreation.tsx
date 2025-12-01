@@ -132,7 +132,9 @@ const CharacterCreation: React.FC = () => {
         id: i + 1,
         name: `Hero ${i + 1}`,
         attributes: attrs,
-        archetype: getArchetype(attrs)
+        archetype: getArchetype(attrs),
+        gold: 20,
+        food: 0
       };
     });
     setCharacters(initialChars);
@@ -146,7 +148,11 @@ const CharacterCreation: React.FC = () => {
     setCharacters(prev => prev.map(c => {
       if (c.id !== id) return c;
       const newAttrs = generateAttributes();
-      return { ...c, attributes: newAttrs, archetype: getArchetype(newAttrs) };
+      return { 
+        ...c, 
+        attributes: newAttrs, 
+        archetype: getArchetype(newAttrs) 
+      };
     }));
   };
 

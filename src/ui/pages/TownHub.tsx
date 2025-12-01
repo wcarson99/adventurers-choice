@@ -2,7 +2,7 @@ import React from 'react';
 import { useGame } from '../../game-engine/GameState';
 
 const TownHub: React.FC = () => {
-  const { setView, gold, food } = useGame();
+  const { setView, getTotalGold, getTotalFood } = useGame();
 
   return (
     <div style={{
@@ -25,8 +25,8 @@ const TownHub: React.FC = () => {
         padding: '1rem',
         borderRadius: '8px'
       }}>
-        <span>💰 Gold: {gold}</span>
-        <span>🍖 Food: {food}</span>
+        <span>💰 Gold: {getTotalGold()}</span>
+        <span>🍖 Food: {getTotalFood()}</span>
       </div>
 
       <h2 style={{ fontSize: '2.5rem', marginBottom: '3rem', color: '#f1c40f' }}>Riverside Village</h2>

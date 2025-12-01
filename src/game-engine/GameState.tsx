@@ -33,13 +33,13 @@ export interface Character {
   name: string;
   attributes: Attributes;
   archetype: string;
+  gold: number;
+  food: number;
 }
 
 // Define the Game State interface
 interface GameState {
   currentView: GameView;
-  gold: number;
-  food: number;
   activeMission?: Mission;
   party: Character[];
 }
@@ -47,17 +47,20 @@ interface GameState {
 // Define the Context interface
 interface GameContextType extends GameState {
   setView: (view: GameView) => void;
-  updateResource: (resource: 'gold' | 'food', amount: number) => void;
+  // Updated to target specific character
+  updateCharacterResource: (charId: number, resource: 'gold' | 'food', amount: number) => void;
   startMission: (mission: Mission) => void;
   completeMission: () => void;
   setParty: (party: Character[]) => void;
+  // Helpers to get totals
+  getTotalGold: () => number;
+  getTotalFood: () => number;
+  consumeFood: (amount: number) => void;
 }
 
 // Default state
 const initialState: GameState = {
   currentView: 'SPLASH',
-  gold: 80,
-  food: 0,
   activeMission: undefined,
   party: [],
 };
@@ -71,8 +74,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setState(prev => ({ ...prev, currentView: view }));
   };
 
-  const updateResource = (resource: 'gold' | 'food', amount: number) => {
-    setState(prev => ({ ...prev, [resource]: prev[resource] + amount }));
+  const updateCharacterResource = (charId: number, resource: 'gold' | 'food', amount: number) => {
+    setState(prev => ({
+      ...prev,
+      party: prev.party.map(c => 
+        c.id === charId ? { ...c, [resource]: c[resource] + amount } : c
+      )
+    }));
   };
 
   const startMission = (mission: Mission) => {
@@ -86,10 +94,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const completeMission = () => {
     setState(prev => {
       if (!prev.activeMission) return prev;
+      
+      // Distribute gold reward evenly (or to first char for MVP)
+      // For MVP, let's give it to the first character
+      const reward = prev.activeMission.rewardGold;
+      
       return {
         ...prev,
-        gold: prev.gold + prev.activeMission.rewardGold,
-        // AP would be added here too
+        party: prev.party.map((c, i) => i === 0 ? { ...c, gold: c.gold + reward } : c),
         activeMission: undefined,
         currentView: 'TOWN'
       };
@@ -100,8 +112,32 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setState(prev => ({ ...prev, party }));
   };
 
+  const getTotalGold = () => state.party.reduce((sum, c) => sum + c.gold, 0);
+  const getTotalFood = () => state.party.reduce((sum, c) => sum + c.food, 0);
+
+  const consumeFood = (amount: number) => {
+    let remaining = amount;
+    const newParty = state.party.map(char => {
+      if (remaining <= 0) return char;
+      const consume = Math.min(char.food, remaining);
+      remaining -= consume;
+      return { ...char, food: char.food - consume };
+    });
+    setState(prev => ({ ...prev, party: newParty }));
+  };
+
   return (
-    <GameContext.Provider value={{ ...state, setView, updateResource, startMission, completeMission, setParty }}>
+    <GameContext.Provider value={{ 
+      ...state, 
+      setView, 
+      updateCharacterResource, 
+      startMission, 
+      completeMission, 
+      setParty,
+      getTotalGold,
+      getTotalFood,
+      consumeFood
+    }}>
       {children}
     </GameContext.Provider>
   );
