@@ -21,7 +21,7 @@ const GeneralStore: React.FC = () => {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      height: '100vh',
+      height: '100%',
       backgroundColor: '#d35400',
       color: '#ecf0f1',
       fontFamily: 'sans-serif',

@@ -42,11 +42,11 @@ export const EncounterView: React.FC = () => {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(${grid.width}, 60px)`,
-      gridTemplateRows: `repeat(${grid.height}, 60px)`,
+      gridTemplateColumns: `repeat(${grid.width}, 80px)`,
+      gridTemplateRows: `repeat(${grid.height}, 80px)`,
       gap: '4px',
       backgroundColor: '#2c3e50',
-      padding: '12px',
+      padding: '16px',
       borderRadius: '8px',
       margin: '2rem auto',
       width: 'fit-content',
@@ -67,8 +67,8 @@ export const EncounterView: React.FC = () => {
             key={index}
             onClick={() => handleTileClick(pos.x, pos.y)}
             style={{
-              width: '60px',
-              height: '60px',
+              width: '80px',
+              height: '80px',
               backgroundColor: '#34495e',
               border: '1px solid #465c71',
               borderRadius: '4px',
@@ -76,7 +76,7 @@ export const EncounterView: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               color: '#7f8c8d',
-              fontSize: '0.7rem',
+              fontSize: '0.8rem',
               cursor: 'pointer',
               transition: 'background-color 0.2s',
               position: 'relative'

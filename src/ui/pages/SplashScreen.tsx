@@ -10,7 +10,7 @@ const SplashScreen: React.FC = () => {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      height: '100vh',
+      height: '100%',
       backgroundColor: '#2c3e50', // Dark background
       color: '#ecf0f1', // Light text
       fontFamily: 'sans-serif'

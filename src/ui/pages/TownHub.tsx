@@ -9,7 +9,7 @@ const TownHub: React.FC = () => {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      height: '100vh',
+      height: '100%',
       backgroundColor: '#7f8c8d', // Greyish town color
       color: '#ecf0f1',
       fontFamily: 'sans-serif',

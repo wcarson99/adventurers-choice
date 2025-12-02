@@ -1,14 +1,131 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <title>The Adventurer's Choice</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #000;
+      }
+      
+      /* Scaling container - centers and scales the game */
+      #game-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        transform-origin: center center;
+      }
+      
+      /* Fixed-size game canvas (16:10 aspect ratio) */
+      #root {
+        width: 1280px;
+        height: 800px;
+        background-color: #1a1a1a;
+        overflow: hidden;
+        position: relative;
+      }
+      
+      /* Lock to landscape on mobile devices */
+      @media screen and (orientation: portrait) and (max-width: 1024px) {
+        body::before {
+          content: "Please rotate your device to landscape mode";
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          color: white;
+          font-size: 1.5rem;
+          text-align: center;
+          padding: 2rem;
+          background: rgba(0,0,0,0.8);
+          border-radius: 8px;
+          z-index: 9999;
+        }
+        
+        #game-container {
+          display: none !important;
+        }
+      }
+    </style>
+    <script>
+      // Responsive scaling function
+      function scaleGame() {
+        const container = document.getElementById('game-container');
+        const root = document.getElementById('root');
+        if (!container || !root) {
+          // Retry if elements not ready
+          requestAnimationFrame(scaleGame);
+          return;
+        }
+        
+        const gameWidth = 1280;
+        const gameHeight = 800;
+        // Force recalculation of window dimensions
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        
+        // Calculate scale to fit viewport while maintaining aspect ratio
+        const scaleX = windowWidth / gameWidth;
+        const scaleY = windowHeight / gameHeight;
+        const scale = Math.min(scaleX, scaleY);
+        
+        // Apply scale transform (force reflow by clearing first)
+        container.style.transform = '';
+        requestAnimationFrame(() => {
+          container.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        });
+        
+        // Debug log
+        console.log(`Window: ${windowWidth}x${windowHeight}, Scale: ${scale.toFixed(3)}`);
+      }
+      
+      let resizeTimeout;
+      function handleResize() {
+        // Clear existing timeout
+        clearTimeout(resizeTimeout);
+        // Immediate scale for responsiveness
+        scaleGame();
+        // Delayed scale to catch any layout shifts
+        resizeTimeout = setTimeout(scaleGame, 100);
+      }
+      
+      // Scale on load, resize, and after a short delay to ensure React has rendered
+      window.addEventListener('load', () => {
+        scaleGame();
+        setTimeout(scaleGame, 100);
+        setTimeout(scaleGame, 500);
+      });
+      window.addEventListener('resize', handleResize);
+      
+      // Initial call
+      scaleGame();
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="game-container">
+      <div id="root"></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

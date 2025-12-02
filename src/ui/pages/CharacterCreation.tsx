@@ -195,7 +195,7 @@ const CharacterCreation: React.FC = () => {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: '100vh',
+      minHeight: '100%',
       backgroundColor: '#2c3e50',
       color: '#ecf0f1',
       fontFamily: 'sans-serif',
