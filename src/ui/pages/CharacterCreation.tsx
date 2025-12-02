@@ -31,6 +31,18 @@ const getArchetype = (attr: Attributes): string => {
   return 'Adventurer';
 };
 
+const getSprite = (archetype: string): string => {
+  switch (archetype) {
+    case 'Vanguard': return '/assets/characters/warrior.png';
+    case 'Scout': return '/assets/characters/thief.png';
+    case 'Scholar': return '/assets/characters/wizard.png';
+    case 'Survivalist': return '/assets/characters/cleric.png';
+    case 'Leader': return '/assets/characters/bard.png';
+    case 'Guardian': return '/assets/characters/paladin.png';
+    default: return '/assets/characters/warrior.png';
+  }
+};
+
 const CharacterCard: React.FC<{ 
   char: Character; 
   onUpdate: (c: Character) => void; 
@@ -52,9 +64,23 @@ const CharacterCard: React.FC<{
       width: '250px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '1rem'
+      gap: '1rem',
+      alignItems: 'center'
     }}>
-      <div>
+      <img 
+        src={char.sprite} 
+        alt={char.archetype} 
+        style={{ 
+          width: '100px', 
+          height: '100px', 
+          objectFit: 'contain',
+          borderRadius: '50%',
+          backgroundColor: '#34495e',
+          border: '2px solid #ecf0f1'
+        }} 
+      />
+
+      <div style={{ width: '100%' }}>
         <label style={{ display: 'block', fontSize: '0.9rem', color: '#bdc3c7', marginBottom: '0.2rem' }}>Name</label>
         <input 
           type="text" 
@@ -126,13 +152,15 @@ const CharacterCreation: React.FC = () => {
   useEffect(() => {
     const initialChars: Character[] = Array.from({ length: 4 }).map((_, i) => {
       const attrs = generateAttributes();
+      const archetype = getArchetype(attrs);
       return {
         id: i + 1,
         name: `Hero ${i + 1}`,
         attributes: attrs,
-        archetype: getArchetype(attrs),
+        archetype: archetype,
         gold: 20,
-        food: 0
+        food: 0,
+        sprite: getSprite(archetype)
       };
     });
     setCharacters(initialChars);
@@ -146,10 +174,12 @@ const CharacterCreation: React.FC = () => {
     setCharacters(prev => prev.map(c => {
       if (c.id !== id) return c;
       const newAttrs = generateAttributes();
+      const newArchetype = getArchetype(newAttrs);
       return { 
         ...c, 
         attributes: newAttrs, 
-        archetype: getArchetype(newAttrs) 
+        archetype: newArchetype,
+        sprite: getSprite(newArchetype)
       };
     }));
   };

@@ -85,7 +85,13 @@ export const EncounterView: React.FC = () => {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#34495e'}
             title={`Tile ${pos.x},${pos.y}`}
           >
-            {renderable && (
+            {renderable && renderable.sprite ? (
+              <img 
+                src={renderable.sprite} 
+                alt="entity" 
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+              />
+            ) : renderable ? (
               <div style={{
                 width: '80%',
                 height: '80%',
@@ -100,7 +106,7 @@ export const EncounterView: React.FC = () => {
               }}>
                 {renderable.char}
               </div>
-            )}
+            ) : null}
             {!renderable && `${pos.x},${pos.y}`}
           </div>
         );

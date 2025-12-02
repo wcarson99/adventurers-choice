@@ -325,6 +325,35 @@ Encounters are categorized by player agency and resolution method:
 - **UI Panels:** Rounded rectangles, clean typography, ample spacing
 - **Animations:** Simple tweens (slide/fade/scale)
 
+### Asset Requirements (Puzzle Phase)
+
+**1. Interactive Mechanisms (Stateful)**
+
+- **Levers/Switches**: Up (Off) and Down (On) sprites.
+- **Pressure Plates**: Raised (Unpressed) and Lowered (Pressed).
+- **Floor Buttons**: Colored buttons (Red, Blue, Green).
+
+**2. Barriers & Doors**
+
+- **Locked Doors**: Iron/Wood doors with visible keyholes.
+- **Magic Barriers**: Glowing energy walls (Red/Blue/Green).
+- **Breakable Walls**: Cracked stone textures.
+
+**3. Key Items**
+
+- **Keys**: Gold, Silver, Rusty, or Color-coded.
+- **Gems/Crystals**: To be placed in statues.
+- **Runes/Tablets**: Stone slabs with symbols.
+
+**4. Movable Objects**
+
+- **Pushable Blocks**: Crates or Boulders distinct from static walls.
+
+**5. Hazards**
+
+- **Spikes**: Retracted (Safe) and Extended (Danger).
+- **Pits**: Dark holes in the floor.
+
 ### Color Palette
 
 - **Warm Primary:** Friendly orange/yellow (adventure feel)

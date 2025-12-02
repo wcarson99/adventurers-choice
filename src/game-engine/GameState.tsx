@@ -35,6 +35,7 @@ export interface Character {
   archetype: string;
   gold: number;
   food: number;
+  sprite: string;
 }
 
 import { World } from './ecs/World';
@@ -45,6 +46,7 @@ import { PositionComponent, RenderableComponent } from './ecs/Component';
 interface GameState {
   currentView: GameView;
   activeMission?: Mission;
+  completedMissions: Mission[];
   party: Character[];
   world?: World;
   grid?: Grid;
@@ -57,6 +59,7 @@ interface GameContextType extends GameState {
   updateCharacterResource: (charId: number, resource: 'gold' | 'food', amount: number) => void;
   startMission: (mission: Mission) => void;
   completeMission: () => void;
+  turnInMission: (missionId: string) => void;
   setParty: (party: Character[]) => void;
   // Helpers to get totals
   getTotalGold: () => number;
@@ -68,6 +71,7 @@ interface GameContextType extends GameState {
 const initialState: GameState = {
   currentView: 'SPLASH',
   activeMission: undefined,
+  completedMissions: [],
   party: [],
 };
 
@@ -98,7 +102,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const hero = state.party[0];
       const entityId = world.createEntity();
       world.addComponent(entityId, { type: 'Position', x: 0, y: 0 } as PositionComponent);
-      world.addComponent(entityId, { type: 'Renderable', char: hero.name[0], color: '#f1c40f' } as RenderableComponent);
+      world.addComponent(entityId, { 
+        type: 'Renderable', 
+        char: hero.name[0], 
+        color: '#f1c40f',
+        sprite: hero.sprite 
+      } as RenderableComponent);
     }
 
     // Spawn Goal at 7,7
@@ -119,17 +128,30 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setState(prev => {
       if (!prev.activeMission) return prev;
       
-      // Distribute gold reward evenly (or to first char for MVP)
-      // For MVP, let's give it to the first character
-      const reward = prev.activeMission.rewardGold;
-      
+      // Add mission to completed list (but don't give reward yet)
       return {
         ...prev,
-        party: prev.party.map((c, i) => i === 0 ? { ...c, gold: c.gold + reward } : c),
+        completedMissions: [...prev.completedMissions, prev.activeMission],
         activeMission: undefined,
         currentView: 'TOWN',
         world: undefined,
         grid: undefined
+      };
+    });
+  };
+
+  const turnInMission = (missionId: string) => {
+    setState(prev => {
+      const mission = prev.completedMissions.find(m => m.id === missionId);
+      if (!mission) return prev;
+      
+      // Give reward when turning in
+      const reward = mission.rewardGold;
+      
+      return {
+        ...prev,
+        party: prev.party.map((c, i) => i === 0 ? { ...c, gold: c.gold + reward } : c),
+        completedMissions: prev.completedMissions.filter(m => m.id !== missionId)
       };
     });
   };
@@ -158,7 +180,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setView, 
       updateCharacterResource, 
       startMission, 
-      completeMission, 
+      completeMission,
+      turnInMission, 
       setParty,
       getTotalGold,
       getTotalFood,
