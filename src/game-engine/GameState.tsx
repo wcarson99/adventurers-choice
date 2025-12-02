@@ -37,11 +37,17 @@ export interface Character {
   food: number;
 }
 
+import { World } from './ecs/World';
+import { Grid } from './grid/Grid';
+import { PositionComponent, RenderableComponent } from './ecs/Component';
+
 // Define the Game State interface
 interface GameState {
   currentView: GameView;
   activeMission?: Mission;
   party: Character[];
+  world?: World;
+  grid?: Grid;
 }
 
 // Define the Context interface
@@ -84,10 +90,28 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const startMission = (mission: Mission) => {
+    const world = new World();
+    const grid = new Grid(8, 8);
+
+    // Spawn first character at 0,0
+    if (state.party.length > 0) {
+      const hero = state.party[0];
+      const entityId = world.createEntity();
+      world.addComponent(entityId, { type: 'Position', x: 0, y: 0 } as PositionComponent);
+      world.addComponent(entityId, { type: 'Renderable', char: hero.name[0], color: '#f1c40f' } as RenderableComponent);
+    }
+
+    // Spawn Goal at 7,7
+    const goalId = world.createEntity();
+    world.addComponent(goalId, { type: 'Position', x: 7, y: 7 } as PositionComponent);
+    world.addComponent(goalId, { type: 'Renderable', char: 'G', color: '#2ecc71' } as RenderableComponent);
+
     setState(prev => ({ 
       ...prev, 
       activeMission: mission,
-      currentView: 'MISSION'
+      currentView: 'MISSION',
+      world,
+      grid
     }));
   };
 
@@ -103,7 +127,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ...prev,
         party: prev.party.map((c, i) => i === 0 ? { ...c, gold: c.gold + reward } : c),
         activeMission: undefined,
-        currentView: 'TOWN'
+        currentView: 'TOWN',
+        world: undefined,
+        grid: undefined
       };
     });
   };

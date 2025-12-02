@@ -87,15 +87,13 @@ const CharacterCard: React.FC<{
         {Object.entries(char.attributes).map(([key, val]) => (
           <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ textTransform: 'uppercase', fontWeight: 'bold', fontSize: '0.9rem', color: '#95a5a6' }}>{key}</span>
-            <div style={{ display: 'flex', gap: '2px' }}>
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: i <= val ? statColor(val) : '#34495e'
-                }} />
-              ))}
+            <div style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: 'bold', 
+              color: statColor(val),
+              fontFamily: 'monospace'
+            }}>
+              {val.toString().padStart(2, '0')}
             </div>
           </div>
         ))}
