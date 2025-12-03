@@ -41,7 +41,7 @@ export interface Character {
 
 import { World } from './ecs/World';
 import { Grid } from './grid/Grid';
-import { PositionComponent, RenderableComponent } from './ecs/Component';
+import { PositionComponent, RenderableComponent, AttributesComponent } from './ecs/Component';
 
 // Define the Game State interface
 interface GameState {
@@ -96,25 +96,41 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const startMission = (mission: Mission) => {
     const world = new World();
-    const grid = new Grid(8, 8);
+    const grid = new Grid(10, 10);
 
-    // Spawn first character at 0,0
-    if (state.party.length > 0) {
-      const hero = state.party[0];
-      const entityId = world.createEntity();
-      world.addComponent(entityId, { type: 'Position', x: 0, y: 0 } as PositionComponent);
-      world.addComponent(entityId, { 
-        type: 'Renderable', 
-        char: hero.name[0], 
-        color: theme.colors.accent,
-        sprite: hero.sprite 
-      } as RenderableComponent);
+    // Spawn all party members in entrance zone (left side, rows 1-4)
+    const entrancePositions = grid.getEntranceZonePositions();
+    state.party.forEach((hero, index) => {
+      if (index < entrancePositions.length) {
+        const pos = entrancePositions[index];
+        const entityId = world.createEntity();
+        world.addComponent(entityId, { type: 'Position', x: pos.x, y: pos.y } as PositionComponent);
+        world.addComponent(entityId, { 
+          type: 'Renderable', 
+          char: hero.name[0], 
+          color: theme.colors.accent,
+          sprite: hero.sprite 
+        } as RenderableComponent);
+        world.addComponent(entityId, {
+          type: 'Attributes',
+          str: hero.attributes.str,
+          dex: hero.attributes.dex,
+          con: hero.attributes.con,
+          int: hero.attributes.int,
+          wis: hero.attributes.wis,
+          cha: hero.attributes.cha
+        } as AttributesComponent);
+      }
+    });
+
+    // Spawn Goal in exit zone (right side, rows 5-8) - use first exit position
+    const exitPositions = grid.getExitZonePositions();
+    if (exitPositions.length > 0) {
+      const goalPos = exitPositions[0];
+      const goalId = world.createEntity();
+      world.addComponent(goalId, { type: 'Position', x: goalPos.x, y: goalPos.y } as PositionComponent);
+      world.addComponent(goalId, { type: 'Renderable', char: 'G', color: '#2ecc71' } as RenderableComponent);
     }
-
-    // Spawn Goal at 7,7
-    const goalId = world.createEntity();
-    world.addComponent(goalId, { type: 'Position', x: 7, y: 7 } as PositionComponent);
-    world.addComponent(goalId, { type: 'Renderable', char: 'G', color: '#2ecc71' } as RenderableComponent);
 
     setState(prev => ({ 
       ...prev, 

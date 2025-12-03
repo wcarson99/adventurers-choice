@@ -1,4 +1,4 @@
-export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled';
+export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled' | 'Attributes';
 
 export interface Component {
   type: ComponentType;
@@ -27,4 +27,14 @@ export interface StatsComponent extends Component {
 
 export interface PlayerControlledComponent extends Component {
   type: 'PlayerControlled';
+}
+
+export interface AttributesComponent extends Component {
+  type: 'Attributes';
+  str: number;
+  dex: number;
+  con: number;
+  int: number;
+  wis: number;
+  cha: number;
 }

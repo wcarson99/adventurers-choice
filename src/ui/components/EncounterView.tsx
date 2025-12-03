@@ -1,38 +1,103 @@
 import React, { useState } from 'react';
 import { useGame } from '../../game-engine/GameState';
-import { PositionComponent, RenderableComponent } from '../../game-engine/ecs/Component';
+import { PositionComponent, RenderableComponent, AttributesComponent } from '../../game-engine/ecs/Component';
 import { theme } from '../styles/theme';
+import { Grid } from '../../game-engine/grid/Grid';
+import { MovementSystem } from '../../game-engine/encounters/MovementSystem';
 
 export const EncounterView: React.FC = () => {
   const { grid, world, completeMission, consumeFood, activeMission } = useGame();
   const [tick, setTick] = useState(0); // Force render
+  const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
+  const [validMoves, setValidMoves] = useState<Array<{ x: number; y: number }>>([]);
+  const movementSystem = new MovementSystem();
 
   if (!grid || !world) return <div>Loading Encounter...</div>;
 
-  const handleTileClick = (x: number, y: number) => {
-    // MVP Movement: Find the hero and move them
-    // In a real system, this would be an Action sent to a System
+  // Get all player characters
+  const getPlayerCharacters = () => {
     const entities = world.getAllEntities();
-    const heroId = entities.find(id => {
+    return entities.filter(id => {
       const r = world.getComponent<RenderableComponent>(id, 'Renderable');
-      return r && r.color === theme.colors.accent; // Hacky way to find hero for now, keeping as is since it's logic not UI style
+      return r && r.color === theme.colors.accent;
     });
+  };
 
-    if (heroId) {
-      const pos = world.getComponent<PositionComponent>(heroId, 'Position');
-      if (pos) {
-        // Simple teleport for now
-        pos.x = x;
-        pos.y = y;
+  const handleCharacterClick = (characterId: number) => {
+    const pos = world.getComponent<PositionComponent>(characterId, 'Position');
+    const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
+    
+    if (!pos || !attrs) return;
+
+    // If clicking the same character, deselect
+    if (selectedCharacter === characterId) {
+      setSelectedCharacter(null);
+      setValidMoves([]);
+      return;
+    }
+
+    // Select character and show valid moves
+    setSelectedCharacter(characterId);
+    const moves = movementSystem.getValidMoves(world, grid, characterId, pos, attrs.dex);
+    setValidMoves(moves);
+  };
+
+  const handleTileClick = (x: number, y: number) => {
+    // If a character is selected and this is a valid move, move them
+    if (selectedCharacter !== null) {
+      const isValidMove = validMoves.some(move => move.x === x && move.y === y);
+      
+      if (isValidMove) {
+        movementSystem.moveCharacter(world, selectedCharacter, { x, y });
+        setSelectedCharacter(null);
+        setValidMoves([]);
         setTick(t => t + 1); // Trigger re-render
 
-        // Check for win condition (Goal at 7,7)
-        if (x === 7 && y === 7) {
+        // Check for win condition (all characters in exit zone)
+        const allCharacters = getPlayerCharacters();
+        const allInExit = allCharacters.every(charId => {
+          const pos = world.getComponent<PositionComponent>(charId, 'Position');
+          return pos && grid.isExitZone(pos.x, pos.y);
+        });
+
+        if (allInExit) {
           setTimeout(() => {
-            alert("Goal Reached! Mission Complete.");
+            alert("All characters reached the exit! Mission Complete.");
             if (activeMission) consumeFood(activeMission.days * 4);
             completeMission();
           }, 100);
+        }
+      } else {
+        // Clicked on invalid tile, check if it's a character to select
+        const entities = world.getAllEntities();
+        const clickedEntity = entities.find(id => {
+          const p = world.getComponent<PositionComponent>(id, 'Position');
+          return p && p.x === x && p.y === y;
+        });
+        
+        if (clickedEntity) {
+          const r = world.getComponent<RenderableComponent>(clickedEntity, 'Renderable');
+          if (r && r.color === theme.colors.accent) {
+            handleCharacterClick(clickedEntity);
+          }
+        } else {
+          // Clicked empty space, deselect
+          setSelectedCharacter(null);
+          setValidMoves([]);
+        }
+      }
+    } else {
+      // No character selected, check if clicking on a character
+      const entities = world.getAllEntities();
+      const clickedEntity = entities.find(id => {
+        const p = world.getComponent<PositionComponent>(id, 'Position');
+        return p && p.x === x && p.y === y;
+      });
+      
+      if (clickedEntity) {
+        const r = world.getComponent<RenderableComponent>(clickedEntity, 'Renderable');
+        if (r && r.color === theme.colors.accent) {
+          handleCharacterClick(clickedEntity);
         }
       }
     }
@@ -63,6 +128,13 @@ export const EncounterView: React.FC = () => {
         });
         const renderable = entityId ? world.getComponent<RenderableComponent>(entityId, 'Renderable') : null;
 
+        // Check if this tile is a valid move
+        const isValidMove = validMoves.some(move => move.x === pos.x && move.y === pos.y);
+        const isSelectedCharacter = selectedCharacter && (() => {
+          const p = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+          return p && p.x === pos.x && p.y === pos.y;
+        })();
+
         return (
           <div
             key={index}
@@ -70,21 +142,43 @@ export const EncounterView: React.FC = () => {
             style={{
               width: '64px',
               height: '64px',
-              backgroundColor: theme.colors.imageBackground,
-              border: `1px solid ${theme.colors.imageBorder}`,
+              backgroundColor: isSelectedCharacter
+                ? '#ffd700' // Gold for selected character
+                : isValidMove
+                ? '#90ee90' // Light green for valid moves
+                : grid.isWall(pos.x, pos.y) 
+                ? '#666' 
+                : grid.isEntranceZone(pos.x, pos.y)
+                ? '#4a90e2'
+                : grid.isExitZone(pos.x, pos.y)
+                ? '#2ecc71'
+                : theme.colors.imageBackground,
+              border: isSelectedCharacter 
+                ? '3px solid #ff8c00'
+                : isValidMove
+                ? '2px solid #32cd32'
+                : `1px solid ${theme.colors.imageBorder}`,
               borderRadius: '4px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: theme.colors.text,
               fontSize: '0.7rem',
-              cursor: 'pointer',
+              cursor: isValidMove || entityId ? 'pointer' : 'default',
               transition: 'background-color 0.2s',
               position: 'relative'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.colors.imageBorder}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.colors.imageBackground}
-            title={`Tile ${pos.x},${pos.y}`}
+            onMouseEnter={(e) => {
+              if (!isValidMove && !isSelectedCharacter && !entityId) {
+                e.currentTarget.style.backgroundColor = theme.colors.imageBorder;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isValidMove && !isSelectedCharacter && !entityId) {
+                e.currentTarget.style.backgroundColor = theme.colors.imageBackground;
+              }
+            }}
+            title={`Tile ${pos.x},${pos.y}${isValidMove ? ' (Valid Move)' : ''}`}
           >
             {renderable && renderable.sprite ? (
               <img 
