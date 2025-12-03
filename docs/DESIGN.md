@@ -14,7 +14,7 @@ tags: [game-design, mvp, roguelike, cooperative, turn-based]
 
 **Key Numbers:**
 
-- Party Size: 3-6 characters
+- Party Size: 3-6 characters (MVP focus: 4 characters)
 - Starting Resources: 20 Gold per character, 0 Food
 - Travel/Food Cost: 1 Food per character per day
 - Mission Rotation: 7 game days (unclaimed missions)
@@ -25,7 +25,7 @@ tags: [game-design, mvp, roguelike, cooperative, turn-based]
 - **Deterministic Attribute Checks:** Meet requirement = 100% success
 - **Death:** Party wipe = Game Over (no resurrection in MVP)
 - **Recovery:** Full HP + Stamina restore between encounters
-- **Encounters:** Opportunities (optional) + Obstacles (mandatory), 8×8 grid
+- **Encounters:** Opportunities (optional) + Obstacles (mandatory), 10×10 grid with border structure
 
 **Tech Stack:** React + TypeScript + Canvas, ECS architecture, turn-based execution
 
@@ -39,7 +39,7 @@ tags: [game-design, mvp, roguelike, cooperative, turn-based]
 | :-------------------- | :-----------: | :-------------------: | :---------------------- |
 | **Core Engine (ECS)** |  ✅ Complete  |      ⏳ Pending       | Basic setup needed      |
 | **Map Generation**    |  ✅ Complete  |      ⏳ Pending       | Graph + Node types      |
-| **Encounter Grid**    |  ✅ Complete  |      ⏳ Pending       | 8x8 Grid, Canvas render |
+| **Encounter Grid**    |  ✅ Complete  |      ⏳ Pending       | 10x10 Grid with border, Canvas render |
 | **Turn System**       |  ✅ Complete  |      ⏳ Pending       | Queue + Execute logic   |
 | **Attribute Checks**  |  ✅ Complete  |      ⏳ Pending       | Deterministic logic     |
 | **Mission System**    |  ✅ Complete  |      ⏳ Pending       | Job board + Rotation    |
@@ -88,7 +88,7 @@ The game uses two resource-linked time scales: **Days** (narrative progress/majo
 
 | Resource                      | Scope                         | Calculation/Constraint                                                                            | Purpose                                                     |
 | :---------------------------- | :---------------------------- | :------------------------------------------------------------------------------------------------ | :---------------------------------------------------------- |
-| **Attribute Scores**          | Individual                    | Randomly generated: sum of 18, max of 5.                                                          | Prerequisite for skills and basis for checks.               |
+| **Attribute Scores**          | Individual                    | Randomly generated: sum of 18, max of 5. Average is 3.                                          | Prerequisite for skills and basis for checks.               |
 | **HP (Hit Points)**           | Individual                    | Base 5 HP + **CON Score**.                                                                        | Damage resilience resource.                                 |
 | **Stamina (Action Resource)** | Individual                    | Base 5 Stamina + **CON Score**. Cost 2-4 for core actions.                                        | Action pool, depleted during Encounters.                    |
 | **Food Resource**             | Party Pool                    | **1 Unit of Food = 2 lbs.**.                                                                      | Primary survival resource. Consumed daily and tactically.   |
@@ -142,10 +142,32 @@ Encounters are categorized by player agency and resolution method:
 
 ### Mini-Game Structure (Tactical Encounters)
 
-- **Structure:** **Node Exploration** on a small, rectangular tactical grid ($8 \times 8$).
-- **Turn Resolution:** **Atomic.** Player pre-commits all character actions, which then execute sequentially in the chosen order. Conflicts result in a failed action but a Food cost and partial penalty (no Stamina refund).
-- **Objective:** The party must move strategically to activate 3-4 specific nodes (puzzles, switches, objectives) to complete the encounter, forcing interaction with all parts of the grid.
+- **Structure:** **Node Exploration** on a $10 \times 10$ tactical grid with border structure.
+  - **Grid Layout:** 10×10 total squares (100 squares)
+  - **Border:** 36 squares forming outer ring
+    - **Entrance Zone:** 4 squares (left side, rows 1-4) - characters start here
+    - **Exit Zone:** 4 squares (right side, rows 6-9) - win condition (all characters reach here)
+    - **Walls:** 28 squares (remaining border - top row, bottom row, and vertical borders excluding entrance/exit)
+  - **Playable Area:** Interior 8×8 grid (rows 1-8, cols 1-8)
+  - **Character Positioning:** Characters cannot share spaces (each needs unique square)
+- **Turn Resolution:** **Two-Phase Planning with Atomic Execution.**
+  1. **Free Action Phase:** Plan all character movements (free, no stamina)
+  2. **Skill Action Phase:** Plan all skill-based actions (cost stamina) based on planned positions
+  3. **Execute Phase:** Commit and execute all movements, then all actions
+- **Planning Flexibility:** Players can return to movement phase to adjust if action planning reveals issues
+- **Objective:** Clear a path from entrance to exit by pushing obstacles out of the way.
 - **Pacing Constraint:** Each Encounter has a soft cap of **40 Total Party Actions**. After turn 20, all Stamina costs increase by +1. After turn 30, all Attribute Checks suffer a -1 penalty.
+
+#### Grid Structure and Boundaries
+
+- **Grid Size:** 10×10 squares (100 total)
+- **Border Structure:**
+  - **Entrance Zone:** Left side, rows 1-4 (4 squares) - characters start here
+  - **Exit Zone:** Right side, rows 6-9 (4 squares) - win condition
+  - **Walls:** All other border squares (top row, bottom row, vertical borders excluding entrance/exit)
+- **Playable Area:** Interior 8×8 grid (rows 1-8, cols 1-8)
+- **Character Positioning:** Characters cannot share spaces (each needs unique square)
+- **Wall Behavior:** Impassable - characters and objects cannot move through walls
 
 #### Visibility and Fog of War (FoW)
 
@@ -251,12 +273,45 @@ Encounters are categorized by player agency and resolution method:
 
 **Action Costs (MVP Starting Values):**
 
-- **Move** (1 square): 1 Stamina
+- **Movement:** Free (no stamina cost) - see Movement Mechanics below
 - **Attribute Action** (STR push, DEX dodge, INT modify, etc.): 2-3 Stamina (varies by action)
 - **Wait:** 0 Stamina (free action)
 - **Consume Food:** 2 Stamina (restores +5 Stamina, net +3)
 
 **Note:** These values can be tuned during playtesting.
+
+### 🚶 Movement Mechanics
+
+**Base Movement:**
+- All characters can move to an adjacent square (free, no stamina cost)
+- Movement is a free action, separate from skill-based actions
+
+**Free Actions:**
+- **Move:** Movement based on DEX patterns (see below)
+- **Wait:** Do nothing (0 stamina, free action)
+- **Focus:** Planned for future (see BACKLOG.md) - Free action that grants bonus to next skill action, scales with `max(INT, WIS)`
+
+**DEX-Based Movement Patterns:**
+
+Movement patterns unlock based on DEX score, providing tactical options rather than just distance:
+
+| DEX Range | Movement Pattern | Description |
+|:---------:|:----------------:|:-----------|
+| **1-3** | **Horizontal/Vertical** | Can move 1 square: ↑ ↓ ← → (orthogonal only) |
+| **4-6** | **Add Diagonal** | Can move 1 square in any direction: ↑ ↓ ← → ↗ ↘ ↖ ↙ |
+| **7-9** | **Add 2-Square Orthogonal** | Can move 1 square any direction OR 2 squares: ↑↑ ↓↓ ←← →→ |
+| **10+** | **Extended Patterns** | Additional patterns TBD (e.g., 2-square diagonal, knight moves, etc.) |
+
+**Movement Rules:**
+- Movement is free (no stamina cost)
+- One movement per character per turn (pattern based on DEX)
+- Cannot move through occupied squares (unless specified by special abilities)
+- 2-square moves require clear path (cannot move through obstacles)
+
+**Design Philosophy:**
+- DEX provides tactical movement options, not just speed
+- Higher DEX unlocks more positioning flexibility
+- Movement patterns create interesting puzzle-solving opportunities
 
 ### 🌳 Progression System: Consumable Attribute Points (AP)
 
@@ -269,18 +324,48 @@ Encounters are categorized by player agency and resolution method:
 
 #### Core Grid Interactions
 
-- **Move Object:** Handled by **STR** (Obstacle Forcing).
-- **Interact/Activate:** Handled by **DEX** (Free Step/Evasion) and **INT** (Temporary Modification).
+- **Move Object:** Handled by **STR** (Obstacle Forcing/Pushing).
+- **Interact/Activate:** Handled by **DEX** (Evasion) and **INT** (Temporary Modification).
 - **Tile Modification:** Handled by **WIS** (Scouting) and **CON** (Fortification).
 
 | Attribute              | Core Mechanic (Active)     | Encounter Purpose                                                                                                                |
 | :--------------------- | :------------------------- | :------------------------------------------------------------------------------------------------------------------------------- |
-| **Strength (STR)**     | **Obstacle Forcing**       | Push, pull, or destroy heavy/damaged grid objects (Move Object interaction).                                                     |
-| **Dexterity (DEX)**    | **Free Step**              | Take one extra movement square per turn as a **free action** (Movement Economy/Evasion).                                         |
+| **Strength (STR)**     | **Obstacle Forcing**       | Push, pull, or destroy heavy/damaged grid objects. Requires STR 3+ (skill). Max weight = STR × 20 lb. Stamina cost = `Math.ceil(objectWeight / STR)`, minimum 1.                    |
+| **Dexterity (DEX)**    | **Movement Patterns**      | Unlocks movement patterns (diagonal, 2-square moves) - see Movement Mechanics. Also handles evasion/trap disarming.              |
 | **Constitution (CON)** | **Resilience Buffer**      | **Fortify Tile** to mitigate environmental damage and penalties for allies.                                                      |
 | **Intelligence (INT)** | **Temporary Modification** | **Precise Activation** of mechanism nodes, temporarily locking their state for sequence puzzles (Interact/Activate interaction). |
 | **Wisdom (WIS)**       | **Situational Awareness**  | **Scout Path** to temporarily reveal hidden hazards, traps, or safe tiles on the grid (Tile Modification/Scouting).              |
 | **Charisma (CHA)**     | **Positional Rally**       | **Inspire/Rally** adjacent allies, granting them a temporary bonus to their next Attribute Check.                                |
+
+**Pushing Mechanics (STR):**
+- **Skill Requirement:** STR 3+ required to push (STR 1-2 cannot push - below average)
+- **Max Pushable Weight:** `STR × 20` pounds
+  - **STR 3:** Can push up to 60 lb (light to medium objects)
+  - **STR 4:** Can push up to 80 lb (medium to heavy objects)
+  - **STR 5:** Can push up to 100 lb (heavy objects)
+- **Stamina Cost:** `Math.ceil(objectWeight / STR)`, minimum 1 stamina
+  - **20 lb object, STR 3:** 20/3 = 7 stamina (light object, expensive)
+  - **20 lb object, STR 4:** 20/4 = 5 stamina (light object, cheaper)
+  - **20 lb object, STR 5:** 20/5 = 4 stamina (light object, efficient)
+  - **60 lb object, STR 3:** 60/3 = 20 stamina (max for STR 3, very expensive)
+  - **60 lb object, STR 4:** 60/4 = 15 stamina (cheaper than STR 3)
+- **Direction:** Push away from character (character must be behind object, on side opposite push direction)
+- **Turning:** Character automatically faces object as part of push action (no separate turn action needed)
+- **Distance:** 1 square per push action
+- **Requirements:**
+  - Character has STR ≥ 3 (skill requirement)
+  - Character adjacent to object (on side opposite push direction)
+  - Object weight ≤ max pushable weight (STR × 20)
+  - Target square must be empty (no wall, object, or character)
+  - Character has enough stamina
+- **Validation:** Push action available if all requirements met (deterministic - no RNG)
+- **Multiple Characters:** Future consideration - multiple characters pushing together (reduces cost or enables heavier objects)
+
+**Path Clearing:**
+- **Clear Path Definition:** Unobstructed orthogonal path from entrance zone to exit zone
+- **Win Condition:** All characters reach exit zone (4 squares on right side, rows 6-9)
+- **Obstacle Placement:** Pushable objects block path but can be pushed away to clear it
+- **Procedural Generation:** Reverse pathfinding approach - start with exit, work backwards to entrance, place obstacles that block path but are solvable
 
 #### Hazard and Encounter Templates
 
@@ -363,29 +448,50 @@ Encounters are categorized by player agency and resolution method:
 
 ### UI/UX Flow (Encounter Turn System)
 
-#### Action Selection Flow
+#### Two-Phase Planning System
 
-1.  **Character Selection:** Player clicks a character to select them
-2.  **Action Assignment:** Player chooses an action for that character
-3.  **Queue Order:** Order of assignment = execution order
-4.  **Reordering:** Click character in queue + use up/down buttons to reorder
-5.  **Default Action:** Unassigned characters automatically get "Wait" action in queue
-6.  **Execution:** Single "Execute Turn" button commits all actions
+**Phase 1: Free Action Planning (Movement)**
+1. **Movement Planning:** Player plans movement for all characters
+   - Click character → Click destination (ghost/preview position shown)
+   - Movement pattern based on character's DEX (orthogonal, diagonal, 2-square)
+   - All planned movements shown as ghost positions
+2. **Visual Feedback:** 
+   - Ghost/preview positions for all planned movements
+   - Highlight valid movement options based on DEX
+   - Show movement pattern (arrows/lines)
+3. **Navigation:** Continue to Action Phase or Clear All
+
+**Phase 2: Skill Action Planning**
+1. **Action Planning:** Player plans skill-based actions for all characters
+   - See ghost positions from Phase 1
+   - Click character → Choose action (Push, Wait, etc.)
+   - Actions planned based on where characters will be after movement
+2. **Backup/Adjustment:**
+   - Can return to Movement Phase to adjust if action planning reveals issues
+   - Clear individual character movements or all movements
+3. **Visual Feedback:**
+   - Show action previews (e.g., arrow showing push direction)
+   - Highlight invalid actions (e.g., pushing when character in way)
+   - Show predicted stamina costs
+
+**Phase 3: Execution**
+1. **Commit:** "Execute Turn" button commits all movements and actions
+2. **Execution Order:**
+   - All movements execute first (simultaneously or in order)
+   - Then all actions execute (in player-chosen order or initiative-based)
+3. **Playback:**
+   - Sequential animation (1-5 seconds per action, TBD)
+   - Playback controls: Speed toggle (1x/2x/4x), Skip to End, Pause
+4. **Failure Handling:** If one character fails an action, all other characters still attempt their actions
 
 #### Action Queue Visualization
 
 - Sidebar/bottom panel showing:
-  - Character portrait + assigned action
-  - Execution order (numbered)
-  - Reorder controls (↑↓ buttons)
-  - Predicted resource costs (Food, Stamina per character)
-
-#### Turn Execution
-
-- **Playback:** Sequential animation (1-5 seconds per action, TBD)
-- **Playback Controls:** Speed toggle (1x/2x/4x), Skip to End, Pause
-- **Failure Handling:** If one character fails an action, all other characters still attempt their actions
-- **All-or-Nothing:** MVP does not support incremental execution (execute one action at a time)
+  - Current phase indicator (Movement Planning / Action Planning)
+  - Character portraits with planned movements (ghost positions)
+  - Character portraits with planned actions
+  - Predicted resource costs (Stamina per character)
+  - Navigation buttons (← Back to Movements, Execute Turn)
 
 #### Post-MVP Feature
 
@@ -476,5 +582,39 @@ Encounters are categorized by player agency and resolution method:
 - **Decision:** HP and Stamina fully restore between encounters (automatic rest/camping).
 - **Stamina Costs (MVP):** Move = 1, Attribute Actions = 2-3, Wait = 0, Consume Food = 2 (restores +5, net +3).
 - **Note:** Values subject to playtesting adjustment.
+
+### [Dec 1, 2025 - Movement Mechanics and Turn Structure]
+
+- **Decision:** Movement is free (no stamina cost). All characters can move to an adjacent square.
+- **Decision:** DEX-based movement patterns unlock tactical options:
+  - DEX 1-3: Horizontal/Vertical only (orthogonal movement)
+  - DEX 4-6: Add diagonal movement
+  - DEX 7-9: Add 2-square orthogonal movement
+  - DEX 10+: Extended patterns TBD
+- **Decision:** Two-phase turn structure:
+  1. Free Action Phase: Plan all movements (preview/ghost positions)
+  2. Skill Action Phase: Plan all skill-based actions (can backup to adjust movements)
+  3. Execute Phase: Commit and execute all movements, then all actions
+- **Decision:** Pushing mechanics: Stamina cost = `Math.ceil(objectWeight / STR)`, minimum 1.
+- **Rationale:** Movement patterns provide tactical depth rather than just speed. Two-phase planning allows players to see board state before committing actions, with flexibility to adjust.
+
+### [Dec 1, 2025 - Grid Structure and Pushing Mechanics]
+
+- **Decision:** Changed from 8×8 to 10×10 grid with border structure.
+- **Decision:** Border contains entrance zone (4 squares, left side), exit zone (4 squares, right side), and walls (remaining border).
+- **Decision:** Characters cannot share spaces (each needs unique square).
+- **Decision:** Pushing direction: Push away from character (character must be behind object). Character automatically faces object as part of push action.
+- **Decision:** Path clearing: Unobstructed orthogonal path from entrance to exit. Win condition is all characters reach exit zone.
+- **Decision:** Procedural generation uses reverse pathfinding - start with exit, work backwards to entrance, place solvable obstacles.
+- **Rationale:** 10×10 grid provides more space for puzzles while maintaining clear boundaries. Border structure clearly defines entrance/exit zones and prevents edge-of-map issues.
+
+### [Dec 1, 2025 - Attribute Skill Thresholds]
+
+- **Decision:** Average attribute score is 3. Skills require above-average attributes (4+) to unlock.
+- **Decision:** STR 1-2 (below average): Cannot perform STR skills (cannot push).
+- **Decision:** STR 3 (average): Can push light objects (up to 60 lb), but expensive stamina cost (weight/STR).
+- **Decision:** STR 4+ (above average): Can push heavier objects (max = STR × 20 lb), with decreasing stamina cost as STR increases.
+- **Decision:** Pushing formula: Max weight = STR × 20 lb, Stamina cost = `Math.ceil(objectWeight / STR)`, minimum 1.
+- **Rationale:** Creates meaningful skill thresholds. Below average cannot use skills, average can attempt but inefficiently, above average unlocks efficient skill use. Applies to other attributes as well (DEX, INT, WIS, etc.).
 
 **MVP Design Complete!** Ready for implementation.

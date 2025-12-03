@@ -118,6 +118,16 @@ This document contains the prioritized list of Vertical Slices for incremental d
 - [ ] **Slice 13.8**: "Carry the Fallen" mechanic (remains have weight, must be brought to town)
 - [ ] **Slice 13.9**: Improvised solutions (use Food/consumables to bypass attribute requirements)
 - [ ] **Slice 13.10**: Multiple solution paths per encounter (Primary vs. Alternate approaches)
+- [ ] **Slice 13.11**: Focus free action mechanic
+  - **Core Concept:** Focus is a free action (like Move and Wait) that grants a bonus to the next skill-based action
+  - **Scaling:** Bonus = `max(INT, WIS)` (mental focus/awareness)
+  - **Thematic:** "Focusing your chi" for accuracy, meditating for spell casting, focusing on person for CHA persuasion
+  - **Design Questions:**
+    - How does bonus apply? (+X to check, -X stamina cost, allows attempting harder actions, or skill-specific?)
+    - When does focus expire? (Lost on movement? After using bonus? After X turns?)
+    - Can you stack focus? (One at a time? Multiple focuses? Focus intensity?)
+    - How does focus work with deterministic checks? (Allow attempting actions above attribute? Just reduce costs?)
+  - **Implementation Note:** Impact must be designed on a skill-by-skill basis (STR push, DEX disarm, CHA persuade, etc. may have different focus effects)
 
 ### UI/UX Enhancements
 
