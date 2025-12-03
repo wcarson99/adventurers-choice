@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
+import { theme } from '../ui/styles/theme';
 
 // Define the possible views in the game loop
 export type GameView =
@@ -105,7 +106,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       world.addComponent(entityId, { 
         type: 'Renderable', 
         char: hero.name[0], 
-        color: '#f1c40f',
+        color: theme.colors.accent,
         sprite: hero.sprite 
       } as RenderableComponent);
     }

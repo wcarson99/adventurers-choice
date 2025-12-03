@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGame } from '../../game-engine/GameState';
+import { theme } from '../styles/theme';
 
 const TownHub: React.FC = () => {
   const { setView, getTotalGold, getTotalFood } = useGame();
@@ -10,8 +11,8 @@ const TownHub: React.FC = () => {
       flexDirection: 'column',
       alignItems: 'center',
       height: '100%',
-      backgroundColor: '#7f8c8d', // Greyish town color
-      color: '#ecf0f1',
+      backgroundColor: theme.colors.background,
+      color: theme.colors.text,
       fontFamily: 'sans-serif',
       padding: '2rem'
     }}>
@@ -21,7 +22,7 @@ const TownHub: React.FC = () => {
         justifyContent: 'space-between', 
         marginBottom: '2rem',
         fontSize: '1.2rem',
-        backgroundColor: '#2c3e50',
+        backgroundColor: theme.colors.cardBackground,
         padding: '1rem',
         borderRadius: '8px'
       }}>
@@ -29,7 +30,7 @@ const TownHub: React.FC = () => {
         <span>🍖 Food: {getTotalFood()}</span>
       </div>
 
-      <h2 style={{ fontSize: '2.5rem', marginBottom: '3rem', color: '#f1c40f' }}>Riverside Village</h2>
+      <h2 style={{ fontSize: '2.5rem', marginBottom: '3rem', color: theme.colors.accentLight }}>Riverside Village</h2>
 
       <div style={{ display: 'flex', gap: '2rem' }}>
         <button 
@@ -37,8 +38,8 @@ const TownHub: React.FC = () => {
           style={{
             padding: '2rem',
             fontSize: '1.5rem',
-            backgroundColor: '#e67e22',
-            color: 'white',
+            backgroundColor: theme.colors.accent,
+            color: theme.colors.background,
             border: 'none',
             borderRadius: '8px',
             cursor: 'pointer',
@@ -53,8 +54,8 @@ const TownHub: React.FC = () => {
           style={{
             padding: '2rem',
             fontSize: '1.5rem',
-            backgroundColor: '#3498db',
-            color: 'white',
+            backgroundColor: theme.colors.success,
+            color: theme.colors.text,
             border: 'none',
             borderRadius: '8px',
             cursor: 'pointer',
@@ -69,8 +70,8 @@ const TownHub: React.FC = () => {
           style={{
             padding: '2rem',
             fontSize: '1.5rem',
-            backgroundColor: '#9b59b6',
-            color: 'white',
+            backgroundColor: theme.colors.cardBackground,
+            color: theme.colors.text,
             border: 'none',
             borderRadius: '8px',
             cursor: 'pointer',

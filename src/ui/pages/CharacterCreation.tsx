@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useGame, Character, Attributes } from '../../game-engine/GameState';
+import { theme } from '../styles/theme';
 
 // Helper to generate random stats summing to 18, max 5, min 1
 const generateAttributes = (): Attributes => {
@@ -22,23 +23,23 @@ const getArchetype = (attr: Attributes): string => {
   const maxVal = Math.max(...Object.values(attr));
   const highest = Object.entries(attr).filter(([_, v]) => v === maxVal).map(([k]) => k);
   
-  if (highest.includes('str')) return 'Vanguard';
-  if (highest.includes('dex')) return 'Scout';
-  if (highest.includes('int')) return 'Scholar';
-  if (highest.includes('wis')) return 'Survivalist';
-  if (highest.includes('cha')) return 'Leader';
-  if (highest.includes('con')) return 'Guardian';
+  if (highest.includes('str')) return 'Warrior';
+  if (highest.includes('dex')) return 'Thief';
+  if (highest.includes('int')) return 'Wizard';
+  if (highest.includes('wis')) return 'Cleric';
+  if (highest.includes('cha')) return 'Bard';
+  if (highest.includes('con')) return 'Paladin';
   return 'Adventurer';
 };
 
 const getSprite = (archetype: string): string => {
   switch (archetype) {
-    case 'Vanguard': return '/assets/characters/warrior.png';
-    case 'Scout': return '/assets/characters/thief.png';
-    case 'Scholar': return '/assets/characters/wizard.png';
-    case 'Survivalist': return '/assets/characters/cleric.png';
-    case 'Leader': return '/assets/characters/bard.png';
-    case 'Guardian': return '/assets/characters/paladin.png';
+    case 'Warrior': return '/assets/characters/warrior.png';
+    case 'Thief': return '/assets/characters/thief.png';
+    case 'Wizard': return '/assets/characters/wizard.png';
+    case 'Cleric': return '/assets/characters/cleric.png';
+    case 'Bard': return '/assets/characters/bard.png';
+    case 'Paladin': return '/assets/characters/paladin.png';
     default: return '/assets/characters/warrior.png';
   }
 };
@@ -48,19 +49,12 @@ const CharacterCard: React.FC<{
   onUpdate: (c: Character) => void; 
   onReroll: () => void 
 }> = ({ char, onUpdate, onReroll }) => {
-  
-  const statColor = (val: number) => {
-    if (val === 5) return '#f1c40f'; // Gold for max
-    if (val >= 3) return '#2ecc71'; // Green for good
-    return '#95a5a6'; // Grey for average/low
-  };
-
   return (
     <div style={{
-      backgroundColor: '#2c3e50',
+      backgroundColor: theme.colors.cardBackground,
       padding: '1.5rem',
       borderRadius: '8px',
-      boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
       width: '250px',
       display: 'flex',
       flexDirection: 'column',
@@ -75,13 +69,12 @@ const CharacterCard: React.FC<{
           height: '100px', 
           objectFit: 'contain',
           borderRadius: '50%',
-          backgroundColor: '#34495e',
-          border: '2px solid #ecf0f1'
+          backgroundColor: theme.colors.imageBackground,
+          border: `2px solid ${theme.colors.imageBorder}`
         }} 
       />
 
       <div style={{ width: '100%' }}>
-        <label style={{ display: 'block', fontSize: '0.9rem', color: '#bdc3c7', marginBottom: '0.2rem' }}>Name</label>
         <input 
           type="text" 
           value={char.name}
@@ -92,8 +85,9 @@ const CharacterCard: React.FC<{
             fontSize: '1.1rem',
             borderRadius: '4px',
             border: 'none',
-            backgroundColor: '#34495e',
-            color: 'white'
+            backgroundColor: theme.colors.background,
+            color: theme.colors.text,
+            textAlign: 'center'
           }}
         />
       </div>
@@ -102,21 +96,24 @@ const CharacterCard: React.FC<{
         textAlign: 'center', 
         fontSize: '1.2rem', 
         fontWeight: 'bold', 
-        color: '#3498db',
-        borderBottom: '1px solid #34495e',
-        paddingBottom: '0.5rem'
+        color: theme.colors.accentLight
       }}>
         {char.archetype}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', columnGap: '2rem' }}>
         {Object.entries(char.attributes).map(([key, val]) => (
-          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ textTransform: 'uppercase', fontWeight: 'bold', fontSize: '0.9rem', color: '#95a5a6' }}>{key}</span>
+          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ 
+              textTransform: 'uppercase', 
+              fontWeight: 'bold', 
+              fontSize: '1.5rem', 
+              color: theme.colors.text
+            }}>{key}</span>
             <div style={{ 
               fontSize: '1.5rem', 
               fontWeight: 'bold', 
-              color: statColor(val),
+              color: theme.colors.text,
               fontFamily: 'monospace'
             }}>
               {val.toString().padStart(2, '0')}
@@ -129,8 +126,8 @@ const CharacterCard: React.FC<{
         onClick={onReroll}
         style={{
           padding: '0.5rem',
-          backgroundColor: '#e67e22',
-          color: 'white',
+          backgroundColor: theme.colors.accent,
+          color: theme.colors.background,
           border: 'none',
           borderRadius: '4px',
           cursor: 'pointer',
@@ -196,13 +193,13 @@ const CharacterCreation: React.FC = () => {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100%',
-      backgroundColor: '#2c3e50',
-      color: '#ecf0f1',
+      backgroundColor: theme.colors.background,
+      color: theme.colors.text,
       fontFamily: 'sans-serif',
       padding: '2rem'
     }}>
-      <h2 style={{ fontSize: '3rem', marginBottom: '1rem', color: '#f1c40f' }}>Assemble Your Party</h2>
-      <p style={{ marginBottom: '3rem', fontSize: '1.2rem', color: '#bdc3c7' }}>
+      <h2 style={{ fontSize: '3rem', marginBottom: '1rem', color: theme.colors.accentLight }}>Assemble Your Party</h2>
+      <p style={{ marginBottom: '3rem', fontSize: '1.2rem', color: theme.colors.accent }}>
         Roll for stats. Ensure your party is balanced for the dangers ahead.
       </p>
       
@@ -228,8 +225,8 @@ const CharacterCreation: React.FC = () => {
         style={{
           padding: '1.5rem 4rem',
           fontSize: '1.8rem',
-          backgroundColor: '#27ae60',
-          color: 'white',
+          backgroundColor: theme.colors.success,
+          color: theme.colors.text,
           border: 'none',
           borderRadius: '8px',
           cursor: 'pointer',

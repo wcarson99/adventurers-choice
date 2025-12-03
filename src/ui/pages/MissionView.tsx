@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGame } from '../../game-engine/GameState';
 import { EncounterView } from '../components/EncounterView';
+import { theme } from '../styles/theme';
 
 export const MissionView: React.FC = () => {
   const { activeMission, completeMission, consumeFood } = useGame();
@@ -20,14 +21,14 @@ export const MissionView: React.FC = () => {
       flexDirection: 'column',
       alignItems: 'center',
       height: '100%',
-      backgroundColor: '#2c3e50',
-      color: '#ecf0f1',
+      backgroundColor: theme.colors.background,
+      color: theme.colors.text,
       fontFamily: 'sans-serif',
-      padding: '2rem'
+      padding: '1rem'
     }}>
-      <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: '#f1c40f' }}>{activeMission.title}</h2>
+      <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: theme.colors.accent }}>{activeMission.title}</h2>
       
-      <p style={{ fontSize: '1.2rem', color: '#bdc3c7' }}>
+      <p style={{ fontSize: '1.2rem', color: theme.colors.text }}>
         Objective: {activeMission.description}
       </p>
       
@@ -39,7 +40,7 @@ export const MissionView: React.FC = () => {
           style={{
             padding: '1rem 2rem',
             fontSize: '1.2rem',
-            backgroundColor: '#e74c3c',
+            backgroundColor: '#e74c3c', // Keep debug button red for now, or use a warning color if we add one to theme
             color: 'white',
             border: 'none',
             borderRadius: '8px',

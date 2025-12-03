@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGame, Mission } from '../../game-engine/GameState';
+import { theme } from '../styles/theme';
 
 const MOCK_MISSIONS: Mission[] = [
   {
@@ -53,18 +54,18 @@ const JobBoard: React.FC = () => {
       flexDirection: 'column',
       alignItems: 'center',
       height: '100%',
-      backgroundColor: '#8e44ad', // Job board color
-      color: '#ecf0f1',
+      backgroundColor: theme.colors.background,
+      color: theme.colors.text,
       fontFamily: 'sans-serif',
       padding: '2rem',
       overflowY: 'auto'
     }}>
-      <h2 style={{ fontSize: '2.5rem', marginBottom: '2rem' }}>Job Board</h2>
+      <h2 style={{ fontSize: '2.5rem', marginBottom: '2rem', color: theme.colors.accentLight }}>Job Board</h2>
       
       {/* Completed Missions Section */}
       {completedMissions.length > 0 && (
         <div style={{ width: '100%', maxWidth: '1200px', marginBottom: '3rem' }}>
-          <h3 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: '#f1c40f' }}>✅ Completed Missions - Turn In For Reward!</h3>
+          <h3 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: theme.colors.accent }}>✅ Completed Missions - Turn In For Reward!</h3>
           <div style={{ 
             display: 'grid', 
             gridTemplateColumns: '1fr 1fr 1fr', 
@@ -72,14 +73,14 @@ const JobBoard: React.FC = () => {
           }}>
             {completedMissions.map(mission => (
               <div key={mission.id} style={{
-                backgroundColor: '#27ae60',
+                backgroundColor: theme.colors.success,
                 padding: '1.5rem',
                 borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                border: '2px solid #f1c40f'
+                border: `2px solid ${theme.colors.accent}`
               }}>
                 <div>
                   <h3 style={{ color: '#fff', marginBottom: '0.5rem' }}>{mission.title}</h3>
@@ -91,8 +92,8 @@ const JobBoard: React.FC = () => {
                   style={{
                     padding: '1rem',
                     fontSize: '1.1rem',
-                    backgroundColor: '#f1c40f',
-                    color: '#2c3e50',
+                    backgroundColor: theme.colors.accent,
+                    color: theme.colors.background,
                     border: 'none',
                     borderRadius: '4px',
                     cursor: 'pointer',
@@ -118,16 +119,16 @@ const JobBoard: React.FC = () => {
         }}>
           {MOCK_MISSIONS.map(mission => (
             <div key={mission.id} style={{
-              backgroundColor: '#2c3e50',
+              backgroundColor: theme.colors.cardBackground,
               padding: '1.5rem',
               borderRadius: '8px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between'
             }}>
               <div>
-                <h3 style={{ color: '#f1c40f', marginBottom: '0.5rem' }}>{mission.title}</h3>
+                <h3 style={{ color: theme.colors.accentLight, marginBottom: '0.5rem' }}>{mission.title}</h3>
                 <p style={{ marginBottom: '1rem', fontStyle: 'italic' }}>{mission.description}</p>
                 <div style={{ marginBottom: '0.5rem' }}>⏳ Duration: {mission.days} Days</div>
                 <div style={{ marginBottom: '0.5rem' }}>🍖 Food Cost: {mission.days * 4}</div>
@@ -139,8 +140,8 @@ const JobBoard: React.FC = () => {
                 style={{
                   padding: '1rem',
                   fontSize: '1.1rem',
-                  backgroundColor: '#27ae60',
-                  color: 'white',
+                  backgroundColor: theme.colors.success,
+                  color: theme.colors.text,
                   border: 'none',
                   borderRadius: '4px',
                   cursor: 'pointer',
@@ -160,8 +161,8 @@ const JobBoard: React.FC = () => {
           marginTop: '3rem',
           padding: '1rem 2rem',
           fontSize: '1.2rem',
-          backgroundColor: '#95a5a6',
-          color: 'white',
+          backgroundColor: theme.colors.cardBackground,
+          color: theme.colors.text,
           border: 'none',
           borderRadius: '4px',
           cursor: 'pointer'

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGame } from '../../game-engine/GameState';
 import { PositionComponent, RenderableComponent } from '../../game-engine/ecs/Component';
+import { theme } from '../styles/theme';
 
 export const EncounterView: React.FC = () => {
   const { grid, world, completeMission, consumeFood, activeMission } = useGame();
@@ -14,7 +15,7 @@ export const EncounterView: React.FC = () => {
     const entities = world.getAllEntities();
     const heroId = entities.find(id => {
       const r = world.getComponent<RenderableComponent>(id, 'Renderable');
-      return r && r.color === '#f1c40f'; // Hacky way to find hero for now
+      return r && r.color === theme.colors.accent; // Hacky way to find hero for now, keeping as is since it's logic not UI style
     });
 
     if (heroId) {
@@ -42,13 +43,13 @@ export const EncounterView: React.FC = () => {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(${grid.width}, 80px)`,
-      gridTemplateRows: `repeat(${grid.height}, 80px)`,
-      gap: '4px',
-      backgroundColor: '#2c3e50',
-      padding: '16px',
+      gridTemplateColumns: `repeat(${grid.width}, 64px)`,
+      gridTemplateRows: `repeat(${grid.height}, 64px)`,
+      gap: '2px',
+      backgroundColor: theme.colors.cardBackground,
+      padding: '8px',
       borderRadius: '8px',
-      margin: '2rem auto',
+      margin: '1rem auto',
       width: 'fit-content',
       boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
     }}>
@@ -67,22 +68,22 @@ export const EncounterView: React.FC = () => {
             key={index}
             onClick={() => handleTileClick(pos.x, pos.y)}
             style={{
-              width: '80px',
-              height: '80px',
-              backgroundColor: '#34495e',
-              border: '1px solid #465c71',
+              width: '64px',
+              height: '64px',
+              backgroundColor: theme.colors.imageBackground,
+              border: `1px solid ${theme.colors.imageBorder}`,
               borderRadius: '4px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#7f8c8d',
-              fontSize: '0.8rem',
+              color: theme.colors.text,
+              fontSize: '0.7rem',
               cursor: 'pointer',
               transition: 'background-color 0.2s',
               position: 'relative'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#465c71'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#34495e'}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.colors.imageBorder}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = theme.colors.imageBackground}
             title={`Tile ${pos.x},${pos.y}`}
           >
             {renderable && renderable.sprite ? (
@@ -100,7 +101,7 @@ export const EncounterView: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#2c3e50',
+                color: theme.colors.cardBackground,
                 fontWeight: 'bold',
                 fontSize: '1.2rem'
               }}>

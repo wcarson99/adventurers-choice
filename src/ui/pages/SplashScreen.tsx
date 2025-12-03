@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGame } from '../../game-engine/GameState';
+import { theme } from '../styles/theme';
 
 const SplashScreen: React.FC = () => {
   const { setView } = useGame();
@@ -11,11 +12,11 @@ const SplashScreen: React.FC = () => {
       alignItems: 'center',
       justifyContent: 'center',
       height: '100%',
-      backgroundColor: '#2c3e50', // Dark background
-      color: '#ecf0f1', // Light text
+      backgroundColor: theme.colors.background,
+      color: theme.colors.text,
       fontFamily: 'sans-serif'
     }}>
-      <h1 style={{ fontSize: '4rem', marginBottom: '2rem', color: '#f1c40f' }}>Adventurer's Choice</h1>
+      <h1 style={{ fontSize: '4rem', marginBottom: '2rem', color: theme.colors.accentLight }}>Adventurer's Choice</h1>
       <p style={{ fontSize: '1.5rem', marginBottom: '3rem', fontStyle: 'italic' }}>
         Survive the Gauntlet. Manage your resources.
       </p>
@@ -24,12 +25,12 @@ const SplashScreen: React.FC = () => {
         style={{
           padding: '1rem 2rem',
           fontSize: '1.5rem',
-          backgroundColor: '#e74c3c',
-          color: 'white',
+          backgroundColor: theme.colors.success,
+          color: theme.colors.text,
           border: 'none',
           borderRadius: '8px',
           cursor: 'pointer',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          boxShadow: '0 4px 6px rgba(0,0,0,0.4)'
         }}
       >
         New Game
