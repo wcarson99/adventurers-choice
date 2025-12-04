@@ -585,64 +585,122 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         overflowY: 'auto',
         boxShadow: '-4px 0 6px rgba(0,0,0,0.3)'
       }}>
-        {/* Mission Title and Description */}
+        {/* Mission Title - Compact */}
         {activeMission && (
-          <>
+          <div style={{
+            marginBottom: '0.75rem',
+            paddingBottom: '0.75rem',
+            borderBottom: `1px solid ${theme.colors.imageBorder}`
+          }}>
             <h2 style={{ 
-              fontSize: '1.5rem', 
-              margin: '0 0 0.5rem 0', 
+              fontSize: '1.2rem', 
+              margin: '0 0 0.25rem 0', 
               color: theme.colors.accent,
               fontWeight: 'bold'
             }}>
               {activeMission.title}
             </h2>
             <p style={{ 
-              fontSize: '0.9rem', 
-              margin: '0 0 1rem 0', 
+              fontSize: '0.75rem', 
+              margin: 0, 
               color: theme.colors.text,
-              lineHeight: '1.4'
+              opacity: 0.8,
+              lineHeight: '1.2'
             }}>
               {activeMission.description}
             </p>
-            <div style={{
-              marginBottom: '1rem',
-              paddingBottom: '1rem',
-              borderBottom: `1px solid ${theme.colors.imageBorder}`
-            }} />
-          </>
+          </div>
         )}
 
-        {/* Instructions - Always visible */}
+        {/* Instructions and Turn Counter - Compact */}
         <div style={{
-          marginBottom: '1rem',
-          padding: '0.75rem',
-          backgroundColor: theme.colors.background,
-          borderRadius: '8px',
-          color: theme.colors.text,
-          fontSize: '0.9rem',
-          fontWeight: 'bold',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>
-          {getInstructions()}
-        </div>
-
-        {/* Turn Counter */}
-        <div style={{
-          marginBottom: '1rem',
+          marginBottom: '0.75rem',
           padding: '0.5rem',
+          backgroundColor: theme.colors.background,
+          borderRadius: '6px',
           color: theme.colors.text,
-          fontSize: '1rem',
-          fontWeight: 'bold'
+          fontSize: '0.85rem',
+          lineHeight: '1.3'
         }}>
-          Turn: 1
+          <div style={{ marginBottom: '0.25rem', fontWeight: 'bold' }}>
+            {getInstructions()}
+          </div>
+          <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>
+            Turn: 1
+          </div>
         </div>
 
-        {/* Movement Planning Controls */}
+        {/* Free Actions - Movement Planning Phase - Compact */}
+        {phase === 'movement' && (() => {
+          const playerCharacters = getPlayerCharacters();
+          
+          return (
+            <div style={{
+              marginBottom: '0.75rem',
+              padding: '0.75rem',
+              backgroundColor: theme.colors.background,
+              borderRadius: '6px',
+              border: `1px solid ${theme.colors.imageBorder}`
+            }}>
+              <div style={{ 
+                marginBottom: '0.5rem', 
+                color: theme.colors.accent,
+                fontSize: '0.9rem',
+                fontWeight: 'bold'
+              }}>
+                Free Actions
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                {playerCharacters.map(charId => {
+                  const charIndex = Array.from(world.getAllEntities()).indexOf(charId);
+                  const charName = party[charIndex]?.name || `C${charIndex + 1}`;
+                  const plannedMove = plannedMovements.get(charId);
+                  const isSelected = selectedCharacter === charId;
+                  
+                  return (
+                    <div
+                      key={charId}
+                      style={{
+                        padding: '0.5rem',
+                        backgroundColor: isSelected 
+                          ? theme.colors.accent 
+                          : theme.colors.cardBackground,
+                        borderRadius: '4px',
+                        border: isSelected 
+                          ? `2px solid ${theme.colors.accentLight}` 
+                          : `1px solid ${theme.colors.imageBorder}`,
+                        fontSize: '0.75rem',
+                        color: isSelected ? theme.colors.background : theme.colors.text,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleCharacterClick(charId)}
+                      title={plannedMove ? `Move: (${plannedMove.from.x},${plannedMove.from.y}) → (${plannedMove.to.x},${plannedMove.to.y})` : 'Wait'}
+                    >
+                      <div style={{ fontWeight: 'bold', marginBottom: '0.15rem', fontSize: '0.8rem' }}>
+                        {charName}
+                      </div>
+                      {plannedMove ? (
+                        <div style={{ fontSize: '0.7rem', opacity: 0.9 }}>
+                          ✓ Move
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                          Wait
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Movement Planning Controls - Compact */}
         {phase === 'movement' && (
           <div style={{
-            marginBottom: '1rem',
+            marginBottom: '0.75rem',
             display: 'flex',
-            flexDirection: 'column',
             gap: '0.5rem'
           }}>
             <button
@@ -652,17 +710,18 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 setValidMoves([]);
               }}
               style={{
-                padding: '0.75rem',
-                fontSize: '1rem',
+                flex: 1,
+                padding: '0.5rem',
+                fontSize: '0.85rem',
                 backgroundColor: theme.colors.cardBackground,
                 color: theme.colors.text,
-                border: `2px solid ${theme.colors.imageBorder}`,
+                border: `1px solid ${theme.colors.imageBorder}`,
                 borderRadius: '4px',
                 cursor: 'pointer',
                 fontWeight: 'bold'
               }}
             >
-              Clear All Movements
+              Clear
             </button>
             <button
               onClick={() => {
@@ -672,8 +731,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               }}
               disabled={hasOverlappingCharacters()}
               style={{
-                padding: '0.75rem',
-                fontSize: '1rem',
+                flex: 1,
+                padding: '0.5rem',
+                fontSize: '0.85rem',
                 backgroundColor: hasOverlappingCharacters() 
                   ? theme.colors.imageBackground 
                   : theme.colors.success,
@@ -685,25 +745,25 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 opacity: hasOverlappingCharacters() ? 0.5 : 1
               }}
             >
-              Plan Skill Actions
+              Plan Skills
             </button>
-            {hasOverlappingCharacters() && (
-              <div style={{
-                fontSize: '0.8rem',
-                color: '#d32f2f',
-                fontStyle: 'italic'
-              }}>
-                ⚠️ Characters cannot overlap
-              </div>
-            )}
+          </div>
+        )}
+        {phase === 'movement' && hasOverlappingCharacters() && (
+          <div style={{
+            marginBottom: '0.75rem',
+            fontSize: '0.75rem',
+            color: '#d32f2f',
+            fontStyle: 'italic',
+            padding: '0.25rem 0.5rem'
+          }}>
+            ⚠️ Characters cannot overlap
           </div>
         )}
 
-        {/* Character Stats - When character selected */}
+        {/* Selected Entity Stats - Only show one at a time */}
         {selectedCharacter && !selectedObject && (() => {
           const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
-          const renderable = world.getComponent<RenderableComponent>(selectedCharacter, 'Renderable');
-          const pos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
           
           if (!attrs) return null;
           
@@ -714,36 +774,32 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           
           return (
             <div style={{
-              padding: '1rem',
+              padding: '0.75rem',
               backgroundColor: theme.colors.background,
-              borderRadius: '8px',
+              borderRadius: '6px',
               color: theme.colors.text,
-              marginBottom: '1rem'
+              marginBottom: '0.75rem',
+              border: `1px solid ${theme.colors.imageBorder}`
             }}>
-              <h3 style={{ marginTop: 0, marginBottom: '0.5rem', color: theme.colors.accent }}>
+              <h3 style={{ marginTop: 0, marginBottom: '0.25rem', color: theme.colors.accent, fontSize: '1rem' }}>
                 {charName}
               </h3>
-              <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: theme.colors.accentLight }}>
+              <div style={{ marginBottom: '0.5rem', fontSize: '0.75rem', color: theme.colors.accentLight }}>
                 {archetype}
               </div>
               
-              <div style={{ marginTop: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.9rem' }}>
-                  <div>STR: {attrs.str}</div>
-                  <div>DEX: {attrs.dex}</div>
-                  <div>CON: {attrs.con}</div>
-                  <div>INT: {attrs.int}</div>
-                  <div>WIS: {attrs.wis}</div>
-                  <div>CHA: {attrs.cha}</div>
-                </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+                <div>STR: {attrs.str}</div>
+                <div>DEX: {attrs.dex}</div>
+                <div>CON: {attrs.con}</div>
+                <div>INT: {attrs.int}</div>
+                <div>WIS: {attrs.wis}</div>
+                <div>CHA: {attrs.cha}</div>
               </div>
               
-              <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.8rem' }}>
                 <div>HP: 10/10</div>
                 <div>Stamina: 10/10</div>
-              </div>
-              
-              <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
                 <div>Gold: {party[charIndex]?.gold || 0}</div>
                 <div>Food: {party[charIndex]?.food || 0}</div>
               </div>
@@ -751,8 +807,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           );
         })()}
 
-        {/* Item Stats - When item selected */}
-        {selectedObject && (() => {
+        {/* Item Stats - When item selected (only if no character selected) */}
+        {selectedObject && !selectedCharacter && (() => {
           const pushable = world.getComponent<PushableComponent>(selectedObject, 'Pushable');
           const renderable = world.getComponent<RenderableComponent>(selectedObject, 'Renderable');
           
@@ -760,27 +816,22 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           
           return (
             <div style={{
-              padding: '1rem',
+              padding: '0.75rem',
               backgroundColor: theme.colors.background,
-              borderRadius: '8px',
+              borderRadius: '6px',
               color: theme.colors.text,
-              marginBottom: '1rem'
+              marginBottom: '0.75rem',
+              border: `1px solid ${theme.colors.imageBorder}`
             }}>
-              <h3 style={{ marginTop: 0, marginBottom: '0.5rem', color: theme.colors.accent }}>
+              <h3 style={{ marginTop: 0, marginBottom: '0.5rem', color: theme.colors.accent, fontSize: '1rem' }}>
                 {renderable?.char === 'C' ? 'Crate' : 'Item'}
               </h3>
               
-              <div style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.8rem' }}>
                 <div>Type: Crate</div>
                 <div>Weight: {pushable.weight} lb</div>
                 <div>Pushable: Yes</div>
               </div>
-              
-              {selectedCharacter && validPushDirections.length > 0 && (
-                <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: theme.colors.accentLight }}>
-                  <div>Push Cost: {validPushDirections[0].staminaCost} stamina</div>
-                </div>
-              )}
             </div>
           );
         })()}
