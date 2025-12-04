@@ -13,17 +13,20 @@ interface EncounterViewProps {
 
 type PlanningPhase = 'movement' | 'skill' | 'executing';
 
-interface PlannedMovement {
-  from: { x: number; y: number };
-  to: { x: number; y: number };
+interface PlannedAction {
+  characterId: number;
+  action: string;
+  targetId?: number;
+  cost: number;
 }
 
 export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onCompleteMission }) => {
   const { grid, world, completeMission, consumeFood, party, showStatus } = useGame();
   const [tick, setTick] = useState(0); // Force render
   const [phase, setPhase] = useState<PlanningPhase>('movement');
-  const [plannedMovements, setPlannedMovements] = useState<Map<number, PlannedMovement>>(new Map());
   const [originalPositions, setOriginalPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
+  const [plannedActions, setPlannedActions] = useState<PlannedAction[]>([]);
+  const [actionOrder, setActionOrder] = useState<number[]>([]); // Character IDs in execution order
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [validMoves, setValidMoves] = useState<Array<{ x: number; y: number }>>([]);
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
@@ -31,7 +34,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
 
-  // Initialize original positions on mount
+  // Initialize original positions at start of turn (when entering movement phase)
   React.useEffect(() => {
     if (world && phase === 'movement') {
       const positions = new Map<number, { x: number; y: number }>();
@@ -44,7 +47,6 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         }
       });
       setOriginalPositions(positions);
-      setPlannedMovements(new Map());
     }
   }, [world, phase === 'movement']);
 
@@ -54,15 +56,18 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const getInstructions = (): string => {
     if (phase === 'movement') {
       if (selectedCharacter) {
-        return '👆 Click a green tile to plan movement. Click grayed original position to undo.';
+        return '👆 Click a green tile to move. Click original position to undo.';
       }
-      if (plannedMovements.size > 0) {
-        return `📋 ${plannedMovements.size} movement(s) planned. Select characters to plan more, or click "Plan Skill Actions".`;
-      }
-      return '👆 Click a character to select, then click a green tile to plan their movement.';
+      return '👆 Click a character to select, then click a green tile to move them.';
     }
     if (phase === 'skill') {
-      return '🎯 Skill Action Planning: Select characters and choose actions (coming soon)';
+      if (selectedCharacter) {
+        return '🎯 Select an action from the dropdown. Use ↑↓ to reorder actions in the queue.';
+      }
+      if (plannedActions.length > 0) {
+        return `📋 ${plannedActions.length} action(s) planned. Select characters to add more, or click "Execute".`;
+      }
+      return '🎯 Click a character to select, then choose an action from the dropdown.';
     }
     return '👆 Click a character to select, then move or push crates';
   };
@@ -76,31 +81,107 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     });
   };
 
-  const handleCharacterClick = (characterId: number) => {
-    if (phase !== 'movement') return;
-    
+  // Get available actions for a character
+  const getAvailableActions = (characterId: number): Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> => {
     const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
-    if (!attrs) return;
+    if (!attrs) return [];
 
-    // Use original position for movement planning
-    const originalPos = originalPositions.get(characterId);
-    if (!originalPos) return;
+    const actions: Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> = [
+      { name: 'Wait', cost: 0 }
+    ];
 
-    // If clicking the same character, deselect
-    if (selectedCharacter === characterId) {
-      setSelectedCharacter(null);
-      setValidMoves([]);
-      setSelectedObject(null);
-      setValidPushDirections([]);
-      return;
+    // Check if character can push (STR 3+)
+    if (attrs.str >= 3) {
+      // Use current position (after movements in skill phase, or original in movement phase)
+      const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
+      const charPos = currentPos ? { x: currentPos.x, y: currentPos.y } : null;
+      
+      if (charPos) {
+        const entities = world.getAllEntities();
+        const adjacentPushable = entities.find(id => {
+          const pushable = world.getComponent<PushableComponent>(id, 'Pushable');
+          if (!pushable) return false;
+          const objPos = world.getComponent<PositionComponent>(id, 'Position');
+          if (!objPos) return false;
+          return grid.getDistance(charPos, objPos) === 1;
+        });
+
+        if (adjacentPushable) {
+          const pushActions = pushSystem.getValidPushActions(world, grid, characterId, adjacentPushable);
+          if (pushActions.length > 0) {
+            actions.push({
+              name: 'Push',
+              cost: pushActions[0].staminaCost,
+              requiresItem: true,
+              targetId: adjacentPushable
+            });
+          }
+        }
+      }
     }
 
-    // Select character and show valid moves from original position
-    setSelectedCharacter(characterId);
-    const moves = movementSystem.getValidMoves(world, grid, characterId, originalPos, attrs.dex);
-    setValidMoves(moves);
+    return actions;
+  };
+
+  const handleCharacterClick = (characterId: number) => {
+    if (phase === 'movement') {
+      const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
+      if (!attrs) return;
+
+      // Get current position and original position
+      const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
+      if (!currentPos) return;
+      const originalPos = originalPositions.get(characterId);
+      if (!originalPos) return;
+
+      // Check if character has already moved
+      const hasMoved = currentPos.x !== originalPos.x || currentPos.y !== originalPos.y;
+      
+      // If character has moved, only allow selection for undo (show original position as only valid move)
+      if (hasMoved) {
+        // If clicking the same character, deselect
+        if (selectedCharacter === characterId) {
+          setSelectedCharacter(null);
+          setValidMoves([]);
+          setSelectedObject(null);
+          setValidPushDirections([]);
+          return;
+        }
+        // Select character but only show original position as valid move (for undo)
+        setSelectedCharacter(characterId);
+        setValidMoves([originalPos]); // Only original position is valid (for undo)
+        return;
+      }
+
+      // Character hasn't moved yet - normal selection
+      // If clicking the same character, deselect
+      if (selectedCharacter === characterId) {
+        setSelectedCharacter(null);
+        setValidMoves([]);
+        setSelectedObject(null);
+        setValidPushDirections([]);
+        return;
+      }
+
+      // Select character and show valid moves from current position
+      setSelectedCharacter(characterId);
+      const moves = movementSystem.getValidMoves(world, grid, characterId, { x: currentPos.x, y: currentPos.y }, attrs.dex);
+      setValidMoves(moves);
+    } else if (phase === 'skill') {
+      // In skill phase, select character for action planning
+      if (selectedCharacter === characterId) {
+        setSelectedCharacter(null);
+        setSelectedObject(null);
+        return;
+      }
+      setSelectedCharacter(characterId);
+      setSelectedObject(null);
+    }
     
     // Check if character is adjacent to any pushable objects
+    const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
+    if (!currentPos) return;
+    
     const entities = world.getAllEntities();
     const adjacentObjects: Array<{ id: number; pushActions: Array<{ direction: { dx: number; dy: number }; staminaCost: number }> }> = [];
     
@@ -111,7 +192,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       const objPos = world.getComponent<PositionComponent>(entityId, 'Position');
       if (!objPos) continue;
       
-      const distance = grid.getDistance(pos, objPos);
+      const distance = grid.getDistance({ x: currentPos.x, y: currentPos.y }, objPos);
       if (distance === 1) {
         // Character is adjacent to this object
         const pushActions = pushSystem.getValidPushActions(world, grid, characterId, entityId);
@@ -131,68 +212,66 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     }
   };
 
-  // Check if planned movements result in overlapping characters
-  const hasOverlappingCharacters = (): boolean => {
-    const destinationMap = new Map<string, number>();
-    for (const [charId, movement] of plannedMovements.entries()) {
-      const key = `${movement.to.x},${movement.to.y}`;
-      if (destinationMap.has(key)) {
+  // Check if a move would result in overlapping characters
+  const wouldOverlap = (targetX: number, targetY: number, excludeCharacterId?: number): boolean => {
+    const entities = world.getAllEntities();
+    for (const id of entities) {
+      if (excludeCharacterId && id === excludeCharacterId) continue;
+      const attrs = world.getComponent<AttributesComponent>(id, 'Attributes');
+      if (!attrs) continue; // Only check characters
+      const pos = world.getComponent<PositionComponent>(id, 'Position');
+      if (pos && pos.x === targetX && pos.y === targetY) {
         return true; // Overlap found
       }
-      destinationMap.set(key, charId);
     }
     return false;
   };
 
   const handleTileClick = (x: number, y: number) => {
-    // Movement planning phase
+    // Movement phase: move characters immediately
     if (phase === 'movement') {
-      // Check if clicking on original position to undo
+      // Check if clicking on original position to undo (restore to original)
       if (selectedCharacter !== null) {
         const originalPos = originalPositions.get(selectedCharacter);
         if (originalPos && originalPos.x === x && originalPos.y === y) {
-          // Undo movement for this character
-          const newPlanned = new Map(plannedMovements);
-          newPlanned.delete(selectedCharacter);
-          setPlannedMovements(newPlanned);
+          // Restore character to original position
+          movementSystem.moveCharacter(world, selectedCharacter, originalPos);
           setSelectedCharacter(null);
           setValidMoves([]);
+          setTick(t => t + 1); // Trigger re-render
           return;
         }
       }
 
-      // If character is selected and this is a valid move, plan the movement
+      // If character is selected and this is a valid move, move immediately
       if (selectedCharacter !== null) {
         const isValidMove = validMoves.some(move => move.x === x && move.y === y);
         
         if (isValidMove) {
-          const originalPos = originalPositions.get(selectedCharacter);
-          if (originalPos) {
-            // Plan the movement
-            const newPlanned = new Map(plannedMovements);
-            newPlanned.set(selectedCharacter, {
-              from: originalPos,
-              to: { x, y }
-            });
-            setPlannedMovements(newPlanned);
-            setSelectedCharacter(null);
-            setValidMoves([]);
+          // Check for overlap before moving
+          if (wouldOverlap(x, y, selectedCharacter)) {
+            showStatus('Cannot move: another character is already there', 'error');
+            return;
           }
+          
+          // Move the character immediately
+          movementSystem.moveCharacter(world, selectedCharacter, { x, y });
+          setSelectedCharacter(null);
+          setValidMoves([]);
+          setTick(t => t + 1); // Trigger re-render
           return;
         }
       }
 
-      // Check if clicking on a character to select
+      // Check if clicking on a character to select (always use current position)
       const entities = world.getAllEntities();
       const clickedEntity = entities.find(id => {
         const r = world.getComponent<RenderableComponent>(id, 'Renderable');
         const attrs = world.getComponent<AttributesComponent>(id, 'Attributes');
         if (!r || !attrs) return false;
-        // Use original position if character has planned movement
-        const originalPos = originalPositions.get(id);
+        
         const currentPos = world.getComponent<PositionComponent>(id, 'Position');
-        const pos = originalPos || (currentPos ? { x: currentPos.x, y: currentPos.y } : null);
-        return pos && pos.x === x && pos.y === y && r.color === theme.colors.accent;
+        return currentPos && currentPos.x === x && currentPos.y === y && r.color === theme.colors.accent;
       });
 
       if (clickedEntity) {
@@ -202,7 +281,31 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       return;
     }
 
-    // Legacy code for skill/executing phases (will be updated later)
+    // Skill phase - allow selecting characters and items
+    if (phase === 'skill') {
+      const entities = world.getAllEntities();
+      const clickedEntity = entities.find(id => {
+        const p = world.getComponent<PositionComponent>(id, 'Position');
+        return p && p.x === x && p.y === y;
+      });
+      
+      if (clickedEntity) {
+        const r = world.getComponent<RenderableComponent>(clickedEntity, 'Renderable');
+        const attrs = world.getComponent<AttributesComponent>(clickedEntity, 'Attributes');
+        const pushable = world.getComponent<PushableComponent>(clickedEntity, 'Pushable');
+        
+        if (r && attrs && r.color === theme.colors.accent) {
+          // Clicked on a character
+          handleCharacterClick(clickedEntity);
+        } else if (pushable) {
+          // Clicked on an item (crate)
+          setSelectedObject(clickedEntity);
+        }
+      }
+      return;
+    }
+
+    // Legacy code for executing phase
     const entities = world.getAllEntities();
     const clickedEntity = entities.find(id => {
       const p = world.getComponent<PositionComponent>(id, 'Position');
@@ -333,6 +436,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         const r = world.getComponent<RenderableComponent>(clickedEntity, 'Renderable');
         if (r && r.color === theme.colors.accent) {
           handleCharacterClick(clickedEntity);
+        } else if (clickedPushable && phase === 'skill') {
+          // In skill phase, selecting an item for push action
+          setSelectedObject(clickedEntity);
         } else if (clickedPushable) {
           // Clicked on a crate - select it
           setSelectedObject(clickedEntity);
@@ -383,62 +489,25 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
         }}>
       {tiles.map((pos, index) => {
-        // Check for entity at this position (using original position in movement phase)
+        // Check for entity at this position (always use current positions)
         const entities = world.getAllEntities();
-        let entityId: number | undefined;
-        let renderable: RenderableComponent | null = null;
-        
-        if (phase === 'movement') {
-          // In movement phase, check original positions
-          for (const id of entities) {
-            const originalPos = originalPositions.get(id);
-            if (originalPos && originalPos.x === pos.x && originalPos.y === pos.y) {
-              entityId = id;
-              renderable = world.getComponent<RenderableComponent>(id, 'Renderable');
-              break;
-            }
-          }
-        } else {
-          // In other phases, use current positions
-          entityId = entities.find(id => {
-            const p = world.getComponent<PositionComponent>(id, 'Position');
-            return p && p.x === pos.x && p.y === pos.y;
-          });
-          renderable = entityId ? world.getComponent<RenderableComponent>(entityId, 'Renderable') : null;
-        }
-
-        // Check for ghost position (planned movement destination)
-        let ghostCharacterId: number | undefined;
-        let ghostRenderable: RenderableComponent | null = null;
-        if (phase === 'movement') {
-          plannedMovements.forEach((movement, charId) => {
-            if (movement.to.x === pos.x && movement.to.y === pos.y) {
-              ghostCharacterId = charId;
-              ghostRenderable = world.getComponent<RenderableComponent>(charId, 'Renderable');
-            }
-          });
-        }
-
-        // Check if this is an original position that should be grayed out
-        const isOriginalPosition = phase === 'movement' && (() => {
-          for (const [charId, originalPos] of originalPositions.entries()) {
-            if (originalPos.x === pos.x && originalPos.y === pos.y) {
-              // Gray out if character has a planned movement
-              return plannedMovements.has(charId);
-            }
-          }
-          return false;
-        })();
+        const entityId = entities.find(id => {
+          const p = world.getComponent<PositionComponent>(id, 'Position');
+          return p && p.x === pos.x && p.y === pos.y;
+        });
+        const renderable = entityId ? world.getComponent<RenderableComponent>(entityId, 'Renderable') : null;
 
         // Check if this tile is a valid move
         const isValidMove = validMoves.some(move => move.x === pos.x && move.y === pos.y);
         const isSelectedCharacter = selectedCharacter && (() => {
-          const originalPos = originalPositions.get(selectedCharacter);
-          if (originalPos) {
-            return originalPos.x === pos.x && originalPos.y === pos.y;
-          }
           const p = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
           return p && p.x === pos.x && p.y === pos.y;
+        })();
+        
+        // Check if this is the original position (for undo hint in movement phase)
+        const isOriginalPosition = phase === 'movement' && selectedCharacter && (() => {
+          const originalPos = originalPositions.get(selectedCharacter);
+          return originalPos && originalPos.x === pos.x && originalPos.y === pos.y;
         })();
         
         // Check if this is a selected object (crate)
@@ -461,9 +530,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
             style={{
               width: `${tileSize}px`,
               height: `${tileSize}px`,
-              backgroundColor: isOriginalPosition
-                ? '#555' // Gray out original positions with planned moves
-                : isSelectedCharacter
+              backgroundColor: isSelectedCharacter
                 ? '#ffd700' // Gold for selected character
                 : isSelectedObject
                 ? '#ffa500' // Orange for selected crate
@@ -532,41 +599,22 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 {renderable.char}
               </div>
             ) : null}
-            {/* Ghost position for planned movement */}
-            {ghostRenderable && ghostCharacterId && (
+            {/* Show original position hint if selected character has moved */}
+            {isOriginalPosition && phase === 'movement' && selectedCharacter && (
               <div style={{
                 position: 'absolute',
-                width: '80%',
-                height: '80%',
-                opacity: 0.6,
-                pointerEvents: 'none'
+                top: '2px',
+                left: '2px',
+                fontSize: '0.6rem',
+                color: '#fff',
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                padding: '2px 4px',
+                borderRadius: '2px'
               }}>
-                {ghostRenderable.sprite ? (
-                  <img 
-                    src={ghostRenderable.sprite} 
-                    alt="ghost" 
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.6 }} 
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: ghostRenderable.color,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: theme.colors.cardBackground,
-                    fontWeight: 'bold',
-                    fontSize: '1.2rem',
-                    opacity: 0.6
-                  }}>
-                    {ghostRenderable.char}
-                  </div>
-                )}
+                Original
               </div>
             )}
-            {!renderable && !ghostRenderable && `${pos.x},${pos.y}`}
+            {!renderable && `${pos.x},${pos.y}`}
           </div>
         );
       })}
@@ -654,7 +702,10 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 {playerCharacters.map(charId => {
                   const charIndex = Array.from(world.getAllEntities()).indexOf(charId);
                   const charName = party[charIndex]?.name || `C${charIndex + 1}`;
-                  const plannedMove = plannedMovements.get(charId);
+                  const currentPos = world.getComponent<PositionComponent>(charId, 'Position');
+                  const originalPos = originalPositions.get(charId);
+                  const hasMoved = originalPos && currentPos && 
+                    (originalPos.x !== currentPos.x || originalPos.y !== currentPos.y);
                   const isSelected = selectedCharacter === charId;
                   
                   return (
@@ -674,12 +725,12 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         cursor: 'pointer'
                       }}
                       onClick={() => handleCharacterClick(charId)}
-                      title={plannedMove ? `Move: (${plannedMove.from.x},${plannedMove.from.y}) → (${plannedMove.to.x},${plannedMove.to.y})` : 'Wait'}
+                      title={hasMoved && currentPos ? `Move: (${originalPos.x},${originalPos.y}) → (${currentPos.x},${currentPos.y})` : 'Wait'}
                     >
                       <div style={{ fontWeight: 'bold', marginBottom: '0.15rem', fontSize: '0.8rem' }}>
                         {charName}
                       </div>
-                      {plannedMove ? (
+                      {hasMoved ? (
                         <div style={{ fontSize: '0.7rem', opacity: 0.9 }}>
                           ✓ Move
                         </div>
@@ -705,9 +756,13 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           }}>
             <button
               onClick={() => {
-                setPlannedMovements(new Map());
+                // Restore all characters to original positions
+                originalPositions.forEach((originalPos, charId) => {
+                  movementSystem.moveCharacter(world, charId, originalPos);
+                });
                 setSelectedCharacter(null);
                 setValidMoves([]);
+                setTick(t => t + 1); // Trigger re-render
               }}
               style={{
                 flex: 1,
@@ -721,45 +776,296 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 fontWeight: 'bold'
               }}
             >
-              Clear
+              Clear All Movements
             </button>
             <button
               onClick={() => {
-                if (!hasOverlappingCharacters()) {
-                  setPhase('skill');
-                }
+                // Characters are already in their new positions, just transition to skill phase
+                setPhase('skill');
+                setSelectedCharacter(null);
+                setValidMoves([]);
               }}
-              disabled={hasOverlappingCharacters()}
               style={{
                 flex: 1,
                 padding: '0.5rem',
                 fontSize: '0.85rem',
-                backgroundColor: hasOverlappingCharacters() 
-                  ? theme.colors.imageBackground 
-                  : theme.colors.success,
+                backgroundColor: theme.colors.success,
                 color: theme.colors.text,
                 border: 'none',
                 borderRadius: '4px',
-                cursor: hasOverlappingCharacters() ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold',
-                opacity: hasOverlappingCharacters() ? 0.5 : 1
+                cursor: 'pointer',
+                fontWeight: 'bold'
               }}
             >
               Plan Skills
             </button>
           </div>
         )}
-        {phase === 'movement' && hasOverlappingCharacters() && (
-          <div style={{
-            marginBottom: '0.75rem',
-            fontSize: '0.75rem',
-            color: '#d32f2f',
-            fontStyle: 'italic',
-            padding: '0.25rem 0.5rem'
-          }}>
-            ⚠️ Characters cannot overlap
-          </div>
-        )}
+
+        {/* Skill Action Planning Phase */}
+        {phase === 'skill' && (() => {
+          const playerCharacters = getPlayerCharacters();
+          
+          return (
+            <>
+              {/* Action Queue - Compact */}
+              <div style={{
+                marginBottom: '0.75rem',
+                padding: '0.75rem',
+                backgroundColor: theme.colors.background,
+                borderRadius: '6px',
+                border: `1px solid ${theme.colors.imageBorder}`
+              }}>
+                <div style={{ 
+                  marginBottom: '0.5rem', 
+                  color: theme.colors.accent,
+                  fontSize: '0.9rem',
+                  fontWeight: 'bold'
+                }}>
+                  Action Queue
+                </div>
+                {plannedActions.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', opacity: 0.7, fontStyle: 'italic' }}>
+                    No actions planned. Select characters to add actions.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {plannedActions.map((action, index) => {
+                      const charIndex = Array.from(world.getAllEntities()).indexOf(action.characterId);
+                      const charName = party[charIndex]?.name || `C${charIndex + 1}`;
+                      return (
+                        <div
+                          key={`${action.characterId}-${index}`}
+                          style={{
+                            padding: '0.5rem',
+                            backgroundColor: theme.colors.cardBackground,
+                            borderRadius: '4px',
+                            border: `1px solid ${theme.colors.imageBorder}`,
+                            fontSize: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <div style={{ fontWeight: 'bold', minWidth: '1.5rem' }}>
+                            {index + 1}.
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            {charName}: {action.action} ({action.cost} stamina)
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (index > 0) {
+                                const newActions = [...plannedActions];
+                                [newActions[index - 1], newActions[index]] = [newActions[index], newActions[index - 1]];
+                                setPlannedActions(newActions);
+                              }
+                            }}
+                            disabled={index === 0}
+                            style={{
+                              padding: '0.25rem 0.4rem',
+                              fontSize: '0.7rem',
+                              backgroundColor: index === 0 ? theme.colors.imageBackground : theme.colors.cardBackground,
+                              color: theme.colors.text,
+                              border: `1px solid ${theme.colors.imageBorder}`,
+                              borderRadius: '3px',
+                              cursor: index === 0 ? 'not-allowed' : 'pointer',
+                              opacity: index === 0 ? 0.5 : 1
+                            }}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (index < plannedActions.length - 1) {
+                                const newActions = [...plannedActions];
+                                [newActions[index], newActions[index + 1]] = [newActions[index + 1], newActions[index]];
+                                setPlannedActions(newActions);
+                              }
+                            }}
+                            disabled={index === plannedActions.length - 1}
+                            style={{
+                              padding: '0.25rem 0.4rem',
+                              fontSize: '0.7rem',
+                              backgroundColor: index === plannedActions.length - 1 ? theme.colors.imageBackground : theme.colors.cardBackground,
+                              color: theme.colors.text,
+                              border: `1px solid ${theme.colors.imageBorder}`,
+                              borderRadius: '3px',
+                              cursor: index === plannedActions.length - 1 ? 'not-allowed' : 'pointer',
+                              opacity: index === plannedActions.length - 1 ? 0.5 : 1
+                            }}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            onClick={() => {
+                              const newActions = plannedActions.filter((_, i) => i !== index);
+                              setPlannedActions(newActions);
+                            }}
+                            style={{
+                              padding: '0.25rem 0.4rem',
+                              fontSize: '0.7rem',
+                              backgroundColor: '#d32f2f',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Available Actions - When character selected */}
+              {selectedCharacter && (() => {
+                const availableActions = getAvailableActions(selectedCharacter);
+                const charIndex = Array.from(world.getAllEntities()).indexOf(selectedCharacter);
+                const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
+                const existingActionIndex = plannedActions.findIndex(a => a.characterId === selectedCharacter);
+                
+                return (
+                  <div style={{
+                    marginBottom: '0.75rem',
+                    padding: '0.75rem',
+                    backgroundColor: theme.colors.background,
+                    borderRadius: '6px',
+                    border: `1px solid ${theme.colors.imageBorder}`
+                  }}>
+                    <div style={{ 
+                      marginBottom: '0.5rem', 
+                      color: theme.colors.accent,
+                      fontSize: '0.9rem',
+                      fontWeight: 'bold'
+                    }}>
+                      {charName} - Select Action
+                    </div>
+                    <select
+                      value={existingActionIndex >= 0 ? plannedActions[existingActionIndex].action : 'Wait'}
+                      onChange={(e) => {
+                        const selectedActionName = e.target.value;
+                        if (selectedActionName === 'Wait' || selectedActionName === '') {
+                          // Remove action (set to Wait)
+                          if (existingActionIndex >= 0) {
+                            const newActions = plannedActions.filter((_, i) => i !== existingActionIndex);
+                            setPlannedActions(newActions);
+                          }
+                        } else {
+                          // Find the action by name
+                          const action = availableActions.find(a => a.name === selectedActionName);
+                          if (action) {
+                            const newAction: PlannedAction = {
+                              characterId: selectedCharacter,
+                              action: action.name,
+                              cost: action.cost,
+                              targetId: action.targetId || (action.requiresItem ? selectedObject || undefined : undefined)
+                            };
+                            
+                            if (existingActionIndex >= 0) {
+                              // Update existing action
+                              const newActions = [...plannedActions];
+                              newActions[existingActionIndex] = newAction;
+                              setPlannedActions(newActions);
+                            } else {
+                              // Add new action
+                              setPlannedActions([...plannedActions, newAction]);
+                            }
+                          }
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        fontSize: '0.85rem',
+                        backgroundColor: theme.colors.cardBackground,
+                        color: theme.colors.text,
+                        border: `1px solid ${theme.colors.imageBorder}`,
+                        borderRadius: '4px'
+                      }}
+                    >
+                      <option value="Wait">Wait (0 stamina)</option>
+                      {availableActions.filter(a => a.name !== 'Wait').map((action, index) => (
+                        <option key={index} value={action.name}>
+                          {action.name} ({action.cost} stamina{action.requiresItem ? ', requires item' : ''})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
+
+              {/* Skill Action Controls - Compact */}
+              <div style={{
+                marginBottom: '0.75rem',
+                display: 'flex',
+                gap: '0.5rem'
+              }}>
+                <button
+                  onClick={() => {
+                    // Restore original positions when going back
+                    originalPositions.forEach((originalPos, charId) => {
+                      movementSystem.moveCharacter(world, charId, originalPos);
+                    });
+                    setPlannedActions([]);
+                    setPhase('movement');
+                    setSelectedCharacter(null);
+                    setSelectedObject(null);
+                    setTick(t => t + 1); // Trigger re-render
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    fontSize: '0.85rem',
+                    backgroundColor: theme.colors.cardBackground,
+                    color: theme.colors.text,
+                    border: `1px solid ${theme.colors.imageBorder}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => {
+                    // Execute all planned actions
+                    setPhase('executing');
+                    // TODO: Execute movements first, then skill actions
+                    // For now, just reset
+                    setTimeout(() => {
+                      setPlannedActions([]);
+                      setPhase('movement');
+                      setSelectedCharacter(null);
+                      setSelectedObject(null);
+                      setTick(t => t + 1);
+                    }, 100);
+                  }}
+                  disabled={plannedActions.length === 0}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    fontSize: '0.85rem',
+                    backgroundColor: plannedActions.length === 0 
+                      ? theme.colors.imageBackground 
+                      : theme.colors.success,
+                    color: theme.colors.text,
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: plannedActions.length === 0 ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    opacity: plannedActions.length === 0 ? 0.5 : 1
+                  }}
+                >
+                  Execute
+                </button>
+              </div>
+            </>
+          );
+        })()}
 
         {/* Selected Entity Stats - Only show one at a time */}
         {selectedCharacter && !selectedObject && (() => {
