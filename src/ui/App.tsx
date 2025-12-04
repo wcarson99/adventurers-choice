@@ -7,6 +7,7 @@ import TownHub from './pages/TownHub';
 import GeneralStore from './pages/GeneralStore';
 import JobBoard from './pages/JobBoard';
 import MissionView from './pages/MissionView';
+import { StatusMessage } from './components/StatusMessage';
 
 const GameViewSwitcher: React.FC = () => {
   const { currentView } = useGame();
@@ -32,6 +33,7 @@ const GameViewSwitcher: React.FC = () => {
 function App() {
   return (
     <GameProvider>
+      <StatusMessage />
       <GameViewSwitcher />
     </GameProvider>
   );

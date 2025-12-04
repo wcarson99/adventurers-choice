@@ -16,40 +16,11 @@ export const MissionView: React.FC = () => {
   if (!activeMission) return <div>No active mission</div>;
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      height: '100%',
-      backgroundColor: theme.colors.background,
-      color: theme.colors.text,
-      fontFamily: 'sans-serif',
-      padding: '1rem'
-    }}>
-      <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: theme.colors.accent }}>{activeMission.title}</h2>
-      
-      <p style={{ fontSize: '1.2rem', color: theme.colors.text }}>
-        Objective: {activeMission.description}
-      </p>
-      
-      <EncounterView />
-
-      <div style={{ marginTop: '2rem' }}>
-        <button 
-          onClick={handleComplete}
-          style={{
-            padding: '1rem 2rem',
-            fontSize: '1.2rem',
-            backgroundColor: '#e74c3c', // Keep debug button red for now, or use a warning color if we add one to theme
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer'
-          }}
-        >
-          Complete Mission (Debug)
-        </button>
-      </div>
+    <div style={{ width: '100%', height: '100%' }}>
+      <EncounterView 
+        activeMission={activeMission} 
+        onCompleteMission={handleComplete} 
+      />
     </div>
   );
 };

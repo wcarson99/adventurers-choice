@@ -3,7 +3,7 @@ import { useGame } from '../../game-engine/GameState';
 import { theme } from '../styles/theme';
 
 const GeneralStore: React.FC = () => {
-  const { setView, party, updateCharacterResource } = useGame();
+  const { setView, party, updateCharacterResource, showStatus } = useGame();
   const [selectedCharId, setSelectedCharId] = useState<number>(party[0]?.id || 0);
 
   const selectedChar = party.find(c => c.id === selectedCharId);
@@ -12,8 +12,9 @@ const GeneralStore: React.FC = () => {
     if (selectedChar && selectedChar.gold >= 1) {
       updateCharacterResource(selectedChar.id, 'gold', -1);
       updateCharacterResource(selectedChar.id, 'food', 4);
+      showStatus(`${selectedChar.name} bought 4 units of food!`, 'success', 2000);
     } else {
-      alert("This character doesn't have enough gold!");
+      showStatus("This character doesn't have enough gold!", 'error', 3000);
     }
   };
 

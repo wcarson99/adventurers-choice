@@ -3,7 +3,7 @@ import { useGame } from '../../game-engine/GameState';
 import { theme } from '../styles/theme';
 
 const TownHub: React.FC = () => {
-  const { setView, getTotalGold, getTotalFood } = useGame();
+  const { setView, getTotalGold, getTotalFood, showStatus } = useGame();
 
   return (
     <div style={{
@@ -66,7 +66,7 @@ const TownHub: React.FC = () => {
         </button>
 
         <button 
-          onClick={() => alert('Resting... (Coming Soon)')}
+          onClick={() => showStatus('Resting... (Coming Soon)', 'info', 2000)}
           style={{
             padding: '2rem',
             fontSize: '1.5rem',

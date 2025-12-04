@@ -1,4 +1,4 @@
-export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled' | 'Attributes';
+export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled' | 'Attributes' | 'Pushable';
 
 export interface Component {
   type: ComponentType;
@@ -37,4 +37,10 @@ export interface AttributesComponent extends Component {
   int: number;
   wis: number;
   cha: number;
+}
+
+export interface PushableComponent extends Component {
+  type: 'Pushable';
+  weight: number; // Weight in pounds
+  sprite?: string; // Optional sprite path
 }

@@ -41,7 +41,7 @@ export interface Character {
 
 import { World } from './ecs/World';
 import { Grid } from './grid/Grid';
-import { PositionComponent, RenderableComponent, AttributesComponent } from './ecs/Component';
+import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from './ecs/Component';
 
 // Define the Game State interface
 interface GameState {
@@ -51,6 +51,13 @@ interface GameState {
   party: Character[];
   world?: World;
   grid?: Grid;
+}
+
+export type StatusMessageType = 'error' | 'success' | 'info';
+
+export interface StatusMessage {
+  text: string;
+  type: StatusMessageType;
 }
 
 // Define the Context interface
@@ -66,6 +73,10 @@ interface GameContextType extends GameState {
   getTotalGold: () => number;
   getTotalFood: () => number;
   consumeFood: (amount: number) => void;
+  // Status message
+  statusMessage: StatusMessage | null;
+  setStatusMessage: (message: StatusMessage | null) => void;
+  showStatus: (text: string, type: StatusMessageType, duration?: number) => void;
 }
 
 // Default state
@@ -80,6 +91,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<GameState>(initialState);
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
 
   const setView = (view: GameView) => {
     setState(prev => ({ ...prev, currentView: view }));
@@ -131,6 +143,33 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       world.addComponent(goalId, { type: 'Position', x: goalPos.x, y: goalPos.y } as PositionComponent);
       world.addComponent(goalId, { type: 'Renderable', char: 'G', color: '#2ecc71' } as RenderableComponent);
     }
+
+    // Spawn pushable crates (30 lb each - pushable by STR 3)
+    // Place 3 crates with empty squares around them for pushing
+    const cratePositions = [
+      { x: 3, y: 3 }, // Center-left, can push in all directions
+      { x: 5, y: 4 }, // Center, can push in all directions
+      { x: 7, y: 5 }  // Center-right, can push in all directions
+    ];
+
+    cratePositions.forEach(pos => {
+      // Only place if it's in playable area and not occupied
+      if (grid.isPlayableArea(pos.x, pos.y)) {
+        const crateId = world.createEntity();
+        world.addComponent(crateId, { type: 'Position', x: pos.x, y: pos.y } as PositionComponent);
+        world.addComponent(crateId, { 
+          type: 'Renderable', 
+          char: 'C', 
+          color: '#8B4513', // Brown for crate
+          sprite: '/assets/items/crate.png'
+        } as RenderableComponent);
+        world.addComponent(crateId, {
+          type: 'Pushable',
+          weight: 30, // 30 lb - pushable by STR 3 (cost: Math.ceil(30/3) = 10 stamina)
+          sprite: '/assets/items/crate.png'
+        } as PushableComponent);
+      }
+    });
 
     setState(prev => ({ 
       ...prev, 
@@ -191,6 +230,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setState(prev => ({ ...prev, party: newParty }));
   };
 
+  const showStatus = (text: string, type: StatusMessageType, duration: number = 3000) => {
+    setStatusMessage({ text, type });
+    if (duration > 0) {
+      setTimeout(() => setStatusMessage(null), duration);
+    }
+  };
+
   return (
     <GameContext.Provider value={{ 
       ...state, 
@@ -202,7 +248,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setParty,
       getTotalGold,
       getTotalFood,
-      consumeFood
+      consumeFood,
+      statusMessage,
+      setStatusMessage,
+      showStatus
     }}>
       {children}
     </GameContext.Provider>
