@@ -2,8 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useGame, Character, Attributes } from '../../game-engine/GameState';
 import { theme } from '../styles/theme';
 
-// Helper to generate random stats summing to 18, max 5, min 1
-const generateAttributes = (): Attributes => {
+// Deterministic stats for each archetype: Primary 5, Secondary 5, Others 2
+const getDeterministicAttributes = (archetype: string): Attributes => {
+  const base: Attributes = { str: 2, dex: 2, con: 2, int: 2, wis: 2, cha: 2 };
+  
+  switch (archetype) {
+    case 'Warrior':
+      return { ...base, str: 5, con: 5 };
+    case 'Thief':
+      return { ...base, dex: 5, str: 5 };
+    case 'Wizard':
+      return { ...base, int: 5, wis: 5 };
+    case 'Cleric':
+      return { ...base, wis: 5, con: 5 };
+    case 'Bard':
+      return { ...base, cha: 5, dex: 5 };
+    case 'Paladin':
+      return { ...base, str: 5, cha: 5 };
+    default:
+      return base;
+  }
+};
+
+// Helper to generate random stats summing to 18, max 5, min 1 (for reroll)
+const generateRandomAttributes = (): Attributes => {
   const attrs: (keyof Attributes)[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
   const values: Record<string, number> = { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 };
   let pointsRemaining = 18 - 6; // Start with 1 in each, distribute remaining 12
@@ -145,18 +167,18 @@ const CharacterCreation: React.FC = () => {
   const { setView, setParty } = useGame();
   const [characters, setCharacters] = useState<Character[]>([]);
 
-  // Initialize characters on mount
+  // Initialize characters on mount with deterministic default party
   useEffect(() => {
-    const initialChars: Character[] = Array.from({ length: 4 }).map((_, i) => {
-      const attrs = generateAttributes();
-      const archetype = getArchetype(attrs);
+    const defaultArchetypes = ['Warrior', 'Thief', 'Paladin', 'Cleric'];
+    const initialChars: Character[] = defaultArchetypes.map((archetype, i) => {
+      const attrs = getDeterministicAttributes(archetype);
       return {
         id: i + 1,
         name: `Hero ${i + 1}`,
         attributes: attrs,
         archetype: archetype,
         gold: 20,
-        food: 0,
+        food: 4, // Start with 4 food per character
         sprite: getSprite(archetype)
       };
     });
@@ -170,7 +192,7 @@ const CharacterCreation: React.FC = () => {
   const handleReroll = (id: number) => {
     setCharacters(prev => prev.map(c => {
       if (c.id !== id) return c;
-      const newAttrs = generateAttributes();
+      const newAttrs = generateRandomAttributes();
       const newArchetype = getArchetype(newAttrs);
       return { 
         ...c, 
