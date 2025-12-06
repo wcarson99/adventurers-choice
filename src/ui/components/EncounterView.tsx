@@ -25,6 +25,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const [tick, setTick] = useState(0); // Force render
   const [phase, setPhase] = useState<PlanningPhase>('movement');
   const [originalPositions, setOriginalPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
+  // Debug flag to show tile coordinates (set to true for testing)
+  const [showTileCoordinates] = useState<boolean>(false);
   const [plannedActions, setPlannedActions] = useState<PlannedAction[]>([]);
   const [actionOrder, setActionOrder] = useState<number[]>([]); // Character IDs in execution order
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
@@ -83,8 +85,19 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
   // Get available actions for a character
   const getAvailableActions = (characterId: number): Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> => {
+    console.log('=== getAvailableActions START ===');
+    console.log('Character ID:', characterId);
+    console.log('Phase:', phase);
+    console.log('Selected Object:', selectedObject);
+    
     const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
-    if (!attrs) return [];
+    if (!attrs) {
+      console.log('❌ No AttributesComponent found for character', characterId);
+      return [];
+    }
+    
+    console.log('Character Attributes:', attrs);
+    console.log('Character STR:', attrs.str);
 
     const actions: Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> = [
       { name: 'Wait', cost: 0 }
@@ -92,34 +105,98 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
     // Check if character can push (STR 3+)
     if (attrs.str >= 3) {
+      console.log('✅ Character has STR >= 3, checking for pushable objects...');
+      
       // Use current position (after movements in skill phase, or original in movement phase)
       const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
       const charPos = currentPos ? { x: currentPos.x, y: currentPos.y } : null;
       
+      console.log('Character Position:', charPos);
+      
       if (charPos) {
-        const entities = world.getAllEntities();
-        const adjacentPushable = entities.find(id => {
-          const pushable = world.getComponent<PushableComponent>(id, 'Pushable');
-          if (!pushable) return false;
-          const objPos = world.getComponent<PositionComponent>(id, 'Position');
-          if (!objPos) return false;
-          return grid.getDistance(charPos, objPos) === 1;
-        });
+        // First check if there's a selected object (crate) that's adjacent
+        let targetPushable: number | undefined;
+        
+        if (selectedObject) {
+          console.log('Selected Object ID:', selectedObject);
+          const pushable = world.getComponent<PushableComponent>(selectedObject, 'Pushable');
+          console.log('Selected Object PushableComponent:', pushable);
+          
+          if (pushable) {
+            const objPos = world.getComponent<PositionComponent>(selectedObject, 'Position');
+            console.log('Selected Object Position:', objPos);
+            
+            if (objPos) {
+              const distance = grid.getDistance(charPos, objPos);
+              console.log('Distance to selected object:', distance);
+              
+              if (distance === 1) {
+                targetPushable = selectedObject;
+                console.log('✅ Selected object is adjacent, using it as target');
+              } else {
+                console.log('❌ Selected object is NOT adjacent (distance:', distance, ')');
+              }
+            } else {
+              console.log('❌ Selected object has no PositionComponent');
+            }
+          } else {
+            console.log('❌ Selected object has no PushableComponent');
+          }
+        } else {
+          console.log('No object selected');
+        }
+        
+        // If no selected object is adjacent, look for any adjacent pushable
+        if (!targetPushable) {
+          console.log('Searching for any adjacent pushable objects...');
+          const entities = world.getAllEntities();
+          console.log('All entities:', entities);
+          
+          targetPushable = entities.find(id => {
+            const pushable = world.getComponent<PushableComponent>(id, 'Pushable');
+            if (!pushable) return false;
+            const objPos = world.getComponent<PositionComponent>(id, 'Position');
+            if (!objPos) return false;
+            const distance = grid.getDistance(charPos, objPos);
+            console.log(`  Entity ${id}: pushable=${!!pushable}, pos=(${objPos.x},${objPos.y}), distance=${distance}`);
+            return distance === 1;
+          });
+          
+          if (targetPushable) {
+            console.log('✅ Found adjacent pushable object:', targetPushable);
+          } else {
+            console.log('❌ No adjacent pushable objects found');
+          }
+        }
 
-        if (adjacentPushable) {
-          const pushActions = pushSystem.getValidPushActions(world, grid, characterId, adjacentPushable);
+        if (targetPushable) {
+          console.log('Checking valid push actions for object:', targetPushable);
+          const pushActions = pushSystem.getValidPushActions(world, grid, characterId, targetPushable);
+          console.log('PushSystem.getValidPushActions result:', pushActions);
+          
           if (pushActions.length > 0) {
+            console.log('✅ Adding Push action with', pushActions.length, 'valid directions');
             actions.push({
               name: 'Push',
               cost: pushActions[0].staminaCost,
               requiresItem: true,
-              targetId: adjacentPushable
+              targetId: targetPushable
             });
+          } else {
+            console.log('❌ No valid push actions returned by PushSystem');
           }
+        } else {
+          console.log('❌ No target pushable object found');
         }
+      } else {
+        console.log('❌ Character has no position');
       }
+    } else {
+      console.log('❌ Character STR < 3, cannot push');
     }
 
+    console.log('Final actions:', actions);
+    console.log('=== getAvailableActions END ===');
     return actions;
   };
 
@@ -283,24 +360,48 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
     // Skill phase - allow selecting characters and items
     if (phase === 'skill') {
+      console.log('=== Skill Phase Tile Click ===');
+      console.log('Clicked tile:', x, y);
+      
       const entities = world.getAllEntities();
       const clickedEntity = entities.find(id => {
         const p = world.getComponent<PositionComponent>(id, 'Position');
         return p && p.x === x && p.y === y;
       });
       
+      console.log('Clicked entity ID:', clickedEntity);
+      
       if (clickedEntity) {
         const r = world.getComponent<RenderableComponent>(clickedEntity, 'Renderable');
         const attrs = world.getComponent<AttributesComponent>(clickedEntity, 'Attributes');
         const pushable = world.getComponent<PushableComponent>(clickedEntity, 'Pushable');
         
+        console.log('Entity components:', { 
+          hasRenderable: !!r, 
+          hasAttributes: !!attrs, 
+          hasPushable: !!pushable,
+          renderableColor: r?.color 
+        });
+        
         if (r && attrs && r.color === theme.colors.accent) {
           // Clicked on a character
+          console.log('✅ Clicked on character:', clickedEntity);
           handleCharacterClick(clickedEntity);
         } else if (pushable) {
           // Clicked on an item (crate)
+          console.log('✅ Clicked on crate:', clickedEntity);
+          console.log('Setting selectedObject to:', clickedEntity);
           setSelectedObject(clickedEntity);
+          setTick(t => t + 1); // Force re-render to update available actions
+          // Re-check available actions for selected character if one is selected
+          if (selectedCharacter) {
+            console.log('Character already selected, actions should update');
+          }
+        } else {
+          console.log('❌ Clicked entity is neither character nor crate');
         }
+      } else {
+        console.log('❌ No entity found at clicked position');
       }
       return;
     }
@@ -526,25 +627,31 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         return (
           <div
             key={index}
+            data-tile-x={pos.x}
+            data-tile-y={pos.y}
+            data-testid={`tile-${pos.x}-${pos.y}`}
             onClick={() => handleTileClick(pos.x, pos.y)}
             style={{
               width: `${tileSize}px`,
               height: `${tileSize}px`,
+              backgroundImage: grid.isWall(pos.x, pos.y)
+                ? 'url(/assets/items/wall.png)'
+                : 'url(/assets/items/stone-floor.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
               backgroundColor: isSelectedCharacter
-                ? '#ffd700' // Gold for selected character
+                ? 'rgba(255, 215, 0, 0.3)' // Gold overlay for selected character
                 : isSelectedObject
-                ? '#ffa500' // Orange for selected crate
+                ? 'rgba(255, 165, 0, 0.3)' // Orange overlay for selected crate
                 : isValidPushDest
-                ? '#98fb98' // Pale green for valid push destinations
+                ? 'rgba(152, 251, 152, 0.3)' // Pale green overlay for valid push destinations
                 : isValidMove
-                ? '#90ee90' // Light green for valid moves
-                : grid.isWall(pos.x, pos.y) 
-                ? '#666' 
+                ? 'rgba(144, 238, 144, 0.3)' // Light green overlay for valid moves
                 : grid.isEntranceZone(pos.x, pos.y)
-                ? '#4a90e2'
+                ? 'rgba(74, 144, 226, 0.3)' // Blue overlay for entrance
                 : grid.isExitZone(pos.x, pos.y)
-                ? '#90ee90' // Light green for all exit zone tiles (consistent)
-                : theme.colors.imageBackground,
+                ? 'rgba(144, 238, 144, 0.3)' // Light green overlay for exit
+                : 'transparent',
               opacity: isOriginalPosition ? 0.5 : 1,
               border: isSelectedCharacter 
                 ? '3px solid #ff8c00'
@@ -554,7 +661,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 ? '2px solid #00ff00'
                 : isValidMove
                 ? '2px solid #32cd32'
-                : `1px solid ${theme.colors.imageBorder}`,
+                : 'none',
               borderRadius: '4px',
               display: 'flex',
               alignItems: 'center',
@@ -562,18 +669,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               color: theme.colors.text,
               fontSize: '0.7rem',
               cursor: isValidMove || entityId ? 'pointer' : 'default',
-              transition: 'background-color 0.2s',
               position: 'relative'
-            }}
-            onMouseEnter={(e) => {
-              if (!isValidMove && !isSelectedCharacter && !entityId) {
-                e.currentTarget.style.backgroundColor = theme.colors.imageBorder;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isValidMove && !isSelectedCharacter && !entityId) {
-                e.currentTarget.style.backgroundColor = theme.colors.imageBackground;
-              }
             }}
             title={`Tile ${pos.x},${pos.y}${isValidMove ? ' (Valid Move)' : ''}`}
           >
@@ -581,6 +677,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               <img 
                 src={renderable.sprite} 
                 alt="entity" 
+                data-entity-id={entityId}
+                data-testid={`entity-${entityId}`}
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
               />
             ) : renderable ? (
@@ -614,7 +712,15 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 Original
               </div>
             )}
-            {!renderable && `${pos.x},${pos.y}`}
+            {showTileCoordinates && !renderable && (
+              <div style={{
+                fontSize: '0.6rem',
+                color: theme.colors.text,
+                opacity: 0.5
+              }}>
+                {pos.x},{pos.y}
+              </div>
+            )}
           </div>
         );
       })}
@@ -923,7 +1029,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
               {/* Available Actions - When character selected */}
               {selectedCharacter && (() => {
+                console.log('=== Rendering Available Actions ===');
+                console.log('Selected Character:', selectedCharacter);
+                console.log('Selected Object:', selectedObject);
                 const availableActions = getAvailableActions(selectedCharacter);
+                console.log('Available Actions returned:', availableActions);
                 const charIndex = Array.from(world.getAllEntities()).indexOf(selectedCharacter);
                 const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
                 const existingActionIndex = plannedActions.findIndex(a => a.characterId === selectedCharacter);
@@ -1032,32 +1142,115 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 </button>
                 <button
                   onClick={() => {
-                    // Execute all planned actions
+                    // Execute all planned actions (or everyone waits if no actions planned)
                     setPhase('executing');
-                    // TODO: Execute movements first, then skill actions
-                    // For now, just reset
+                    
+                    // Execute each planned action
+                    plannedActions.forEach((plannedAction) => {
+                      if (plannedAction.action === 'Push' && plannedAction.targetId) {
+                        console.log(`🔄 Executing Push: character ${plannedAction.characterId}, object ${plannedAction.targetId}`);
+                        
+                        // Get valid push directions for this character and object
+                        const pushActions = pushSystem.getValidPushActions(
+                          world,
+                          grid,
+                          plannedAction.characterId,
+                          plannedAction.targetId
+                        );
+                        
+                        console.log(`  Found ${pushActions.length} valid push directions:`, pushActions);
+                        
+                        if (pushActions.length > 0) {
+                          // Find the direction that makes sense based on character position
+                          // Character should be behind the object in the push direction
+                          const charPos = world.getComponent<PositionComponent>(plannedAction.characterId, 'Position');
+                          const objPos = world.getComponent<PositionComponent>(plannedAction.targetId, 'Position');
+                          
+                          let pushDirection = pushActions[0].direction; // Default to first
+                          
+                          if (charPos && objPos) {
+                            // Calculate direction from character to object
+                            const charToObj = {
+                              dx: objPos.x - charPos.x,
+                              dy: objPos.y - charPos.y
+                            };
+                            
+                            // Find push direction that matches (character behind object)
+                            const matchingDirection = pushActions.find(pa => 
+                              pa.direction.dx === charToObj.dx && pa.direction.dy === charToObj.dy
+                            );
+                            
+                            if (matchingDirection) {
+                              pushDirection = matchingDirection.direction;
+                              console.log(`  ✅ Using matching direction: (${pushDirection.dx}, ${pushDirection.dy})`);
+                            } else {
+                              console.log(`  ⚠️ No matching direction found, using first: (${pushDirection.dx}, ${pushDirection.dy})`);
+                            }
+                          }
+                          
+                          // Get object's current position BEFORE pushing (copy the values, not the reference)
+                          const objPosComponent = world.getComponent<PositionComponent>(plannedAction.targetId, 'Position');
+                          if (!objPosComponent) {
+                            console.log(`❌ Object ${plannedAction.targetId} has no position`);
+                            showStatus('Cannot push: object has no position', 'error');
+                            return;
+                          }
+                          
+                          // Copy the position values (before they get modified by pushObject)
+                          const objOldPosition = { x: objPosComponent.x, y: objPosComponent.y };
+                          console.log(`  Object old position: (${objOldPosition.x}, ${objOldPosition.y})`);
+                          
+                          // Push the object (this modifies objPosComponent)
+                          pushSystem.pushObject(world, plannedAction.targetId, pushDirection);
+                          
+                          // Move character to object's old position (using the copied values)
+                          movementSystem.moveCharacter(world, plannedAction.characterId, objOldPosition);
+                          
+                          console.log(`✅ Pushed object ${plannedAction.targetId} in direction (${pushDirection.dx}, ${pushDirection.dy})`);
+                          console.log(`✅ Moved character ${plannedAction.characterId} to object's old position (${objOldPosition.x}, ${objOldPosition.y})`);
+                          showStatus(`Pushed crate!`, 'success');
+                          
+                          // Trigger re-render to show the movement
+                          setTick(t => t + 1);
+                        } else {
+                          console.log(`❌ No valid push directions for character ${plannedAction.characterId} and object ${plannedAction.targetId}`);
+                          showStatus('Cannot push: no valid direction', 'error');
+                        }
+                      } else if (plannedAction.action === 'Wait') {
+                        // Wait action - do nothing
+                        console.log(`Character ${plannedAction.characterId} waits`);
+                      }
+                    });
+                    
+                    // Reset after execution
                     setTimeout(() => {
                       setPlannedActions([]);
                       setPhase('movement');
                       setSelectedCharacter(null);
                       setSelectedObject(null);
+                      // Update original positions for next turn
+                      const newOriginalPositions = new Map<number, { x: number; y: number }>();
+                      const playerCharacters = getPlayerCharacters();
+                      playerCharacters.forEach(charId => {
+                        const pos = world.getComponent<PositionComponent>(charId, 'Position');
+                        if (pos) {
+                          newOriginalPositions.set(charId, { x: pos.x, y: pos.y });
+                        }
+                      });
+                      setOriginalPositions(newOriginalPositions);
                       setTick(t => t + 1);
-                    }, 100);
+                    }, 500); // Give time for animations/visual feedback
                   }}
-                  disabled={plannedActions.length === 0}
                   style={{
                     flex: 1,
                     padding: '0.5rem',
                     fontSize: '0.85rem',
-                    backgroundColor: plannedActions.length === 0 
-                      ? theme.colors.imageBackground 
-                      : theme.colors.success,
+                    backgroundColor: theme.colors.success,
                     color: theme.colors.text,
                     border: 'none',
                     borderRadius: '4px',
-                    cursor: plannedActions.length === 0 ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold',
-                    opacity: plannedActions.length === 0 ? 0.5 : 1
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
                   }}
                 >
                   Execute
@@ -1142,31 +1335,6 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           );
         })()}
 
-        {/* Complete Mission Button - At bottom */}
-        {onCompleteMission && (
-          <div style={{
-            marginTop: 'auto',
-            paddingTop: '1rem',
-            borderTop: `1px solid ${theme.colors.imageBorder}`
-          }}>
-            <button 
-              onClick={onCompleteMission}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                fontSize: '0.9rem',
-                backgroundColor: '#e74c3c',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Complete Mission (Debug)
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

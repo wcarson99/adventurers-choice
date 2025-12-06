@@ -20,7 +20,6 @@ The following files define the long-term context, constraints, and priorities of
 3.  **RUN (Execute the Test):** Instruct the user to run the provided test script and paste the raw command-line output (including errors and stack traces).
 4.  **GREEN (Write Minimum Code):** Based *only* on the failure output/logs, write the **minimum necessary application code** to pass the test.
 5.  **REFACTOR (Clean Up):** Once the test passes, suggest minor improvements, ensuring the changes align with **`ARCHITECTURE.md`**'s ECS and turn-based constraints.
-
 ## Productivity Directives (Max AI Utility)
 * **Adherence to Context:** All code suggestions must respect the design patterns (especially **ECS**) and the **Turn-Based Execution Model** defined in **`ARCHITECTURE.md`**.
 * **Prioritize Log Analysis:** The raw terminal output from Playwright is your primary source of debugging information. **Analyze this output before suggesting any code changes.**

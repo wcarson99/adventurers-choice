@@ -135,19 +135,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    // Spawn Goal in exit zone (right side, rows 5-8) - use first exit position
-    const exitPositions = grid.getExitZonePositions();
-    if (exitPositions.length > 0) {
-      const goalPos = exitPositions[0];
-      const goalId = world.createEntity();
-      world.addComponent(goalId, { type: 'Position', x: goalPos.x, y: goalPos.y } as PositionComponent);
-      world.addComponent(goalId, { type: 'Renderable', char: 'G', color: '#2ecc71' } as RenderableComponent);
-    }
-
     // Spawn pushable crates (30 lb each - pushable by STR 3)
-    // Place 3 crates with empty squares around them for pushing
+    // Simplified for testing: Place first crate directly in front of first character (warrior at 0,1)
+    // Warrior at (0,1), crate at (1,1) - warrior can push it right to (2,1)
     const cratePositions = [
-      { x: 3, y: 3 }, // Center-left, can push in all directions
+      { x: 1, y: 1 }, // Directly in front of warrior (0,1) - easy push test
       { x: 5, y: 4 }, // Center, can push in all directions
       { x: 7, y: 5 }  // Center-right, can push in all directions
     ];

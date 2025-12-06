@@ -27,7 +27,11 @@ export class PushSystem {
     const objPos = world.getComponent<PositionComponent>(objectId, 'Position');
     const pushable = world.getComponent<PushableComponent>(objectId, 'Pushable');
 
+    console.log(`    canPush check: char=${characterId}, obj=${objectId}, dir=(${direction.dx},${direction.dy})`);
+    console.log(`      Components: charAttrs=${!!charAttrs}, charPos=${!!charPos}, objPos=${!!objPos}, pushable=${!!pushable}`);
+
     if (!charAttrs || !charPos || !objPos || !pushable) {
+      console.log(`      ❌ Missing components`);
       return { canPush: false, reason: 'Missing components' };
     }
 
@@ -55,8 +59,17 @@ export class PushSystem {
     };
     
     // Character should be behind the object (opposite of push direction)
-    if (charToObj.dx !== -direction.dx || charToObj.dy !== -direction.dy) {
-      return { canPush: false, reason: 'Character must be behind object (opposite push direction)' };
+    // Example: Character at (2,3), Object at (3,3)
+    // - charToObj = (1, 0) means object is 1 unit to the RIGHT of character
+    // - To push RIGHT (direction = (1, 0)), character should be on the LEFT
+    // - So charToObj should be (1, 0) and direction should be (1, 0) - they MATCH
+    // - Character is on the left, pushing object to the right
+    // 
+    // General rule: charToObj points FROM character TO object
+    // Push direction points where we want to move the object
+    // For a valid push, charToObj should equal direction (character behind object in push direction)
+    if (charToObj.dx !== direction.dx || charToObj.dy !== direction.dy) {
+      return { canPush: false, reason: `Character must be behind object. charToObj=(${charToObj.dx},${charToObj.dy}), direction=(${direction.dx},${direction.dy})` };
     }
 
     // Calculate target position
@@ -127,16 +140,27 @@ export class PushSystem {
     characterId: number,
     objectId: number
   ): Array<{ direction: { dx: number; dy: number }; staminaCost: number }> {
+    console.log('=== PushSystem.getValidPushActions ===');
+    console.log('Character ID:', characterId);
+    console.log('Object ID:', objectId);
+    
     const validPushes: Array<{ direction: { dx: number; dy: number }; staminaCost: number }> = [];
     const directions = this.getPushDirections();
 
     for (const dir of directions) {
+      console.log(`Checking direction: ${dir.name} (${dir.dx}, ${dir.dy})`);
       const result = this.canPush(world, grid, characterId, objectId, dir);
+      console.log(`  Result:`, result);
       if (result.canPush && result.staminaCost) {
+        console.log(`  ✅ Valid push direction`);
         validPushes.push({ direction: dir, staminaCost: result.staminaCost });
+      } else {
+        console.log(`  ❌ Invalid: ${result.reason || 'unknown'}`);
       }
     }
 
+    console.log('Total valid pushes:', validPushes.length);
+    console.log('=== PushSystem.getValidPushActions END ===');
     return validPushes;
   }
 
