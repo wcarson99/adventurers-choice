@@ -258,6 +258,39 @@ This document captures key design and architecture decisions made during develop
 
 ---
 
+## ADR-011: Square Occupancy Rules
+
+**Date:** 2025-12-01  
+**Status:** Accepted  
+**Context:** Deciding occupancy rules for grid squares to support encounter persistence and test campaigns.  
+**Decision:** 
+- One item per square maximum
+- Character and item cannot share the same square
+- Characters cannot share spaces (already established)
+
+**Rationale:**
+
+- **Visual clarity:** Prevents sprite overlap and interaction ambiguity
+- **Consistent rules:** All entity types follow same "one per square" rule
+- **Simpler implementation:** No need for stacking logic, multi-entity selection, or overlap rendering
+- **Clear interactions:** Clicking a square always targets exactly one entity
+- **Test campaign support:** Deterministic placement rules make encounter design and testing straightforward
+
+**Consequences:**
+
+- Items must be placed on empty squares (cannot be in character spawn/exit zones or on occupied squares)
+- Encounter generation must check for available squares when placing items
+- Movement validation must check for both characters and items when determining if a square is occupied
+- Clear visual representation (one entity per square)
+
+**Alternatives Considered:**
+
+- **Multiple items per square:** Rejected (visual complexity, interaction ambiguity, not needed for MVP)
+- **Character + item on same square (auto-collect):** Rejected (visual overlap, less player control)
+- **Character + item on same square (manual collect):** Rejected (extra complexity, inconsistent with character-character rule)
+
+---
+
 ## Post-MVP Decisions (Backlog)
 
 The following decisions are deferred until post-MVP development:

@@ -150,6 +150,7 @@ Encounters are categorized by player agency and resolution method:
     - **Walls:** 28 squares (remaining border - top row, bottom row, and vertical borders excluding entrance/exit)
   - **Playable Area:** Interior 8×8 grid (rows 1-8, cols 1-8)
   - **Character Positioning:** Characters cannot share spaces (each needs unique square)
+  - **Square Occupancy:** One entity per square maximum (characters, obstacles, items all follow this rule)
 - **Turn Resolution:** **Two-Phase Planning with Atomic Execution.**
   1. **Free Action Phase:** Plan all character movements (free, no stamina)
   2. **Skill Action Phase:** Plan all skill-based actions (cost stamina) based on planned positions
@@ -166,7 +167,11 @@ Encounters are categorized by player agency and resolution method:
   - **Exit Zone:** Right side, rows 6-9 (4 squares) - win condition
   - **Walls:** All other border squares (top row, bottom row, vertical borders excluding entrance/exit)
 - **Playable Area:** Interior 8×8 grid (rows 1-8, cols 1-8)
-- **Character Positioning:** Characters cannot share spaces (each needs unique square)
+- **Square Occupancy Rules:**
+  - **One entity per square:** Each square can contain at most one entity (character, obstacle, item, etc.)
+  - **Characters cannot share spaces:** Each character needs a unique square
+  - **Items cannot share squares:** Maximum one item per square
+  - **Character and item cannot share squares:** Items must be placed on empty squares, not on squares with characters
 - **Wall Behavior:** Impassable - characters and objects cannot move through walls
 
 #### Visibility and Fog of War (FoW)
@@ -616,5 +621,12 @@ Movement patterns unlock based on DEX score, providing tactical options rather t
 - **Decision:** STR 4+ (above average): Can push heavier objects (max = STR × 20 lb), with decreasing stamina cost as STR increases.
 - **Decision:** Pushing formula: Max weight = STR × 20 lb, Stamina cost = `Math.ceil(objectWeight / STR)`, minimum 1.
 - **Rationale:** Creates meaningful skill thresholds. Below average cannot use skills, average can attempt but inefficiently, above average unlocks efficient skill use. Applies to other attributes as well (DEX, INT, WIS, etc.).
+
+### [Dec 1, 2025 - Square Occupancy Rules]
+
+- **Decision:** One item per square maximum.
+- **Decision:** Character and item cannot share the same square.
+- **Decision:** All entity types (characters, obstacles, items) follow the "one entity per square" rule.
+- **Rationale:** Ensures visual clarity, consistent rules, simpler implementation, and clear interactions. Supports deterministic encounter design for test campaigns.
 
 **MVP Design Complete!** Ready for implementation.
