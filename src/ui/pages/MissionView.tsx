@@ -4,16 +4,22 @@ import { EncounterView } from '../components/EncounterView';
 import { theme } from '../styles/theme';
 
 export const MissionView: React.FC = () => {
-  const { activeMission, completeMission, consumeFood } = useGame();
+  const { activeMission, completeMission, consumeFood, activeCampaign, currentEncounterIndex } = useGame();
 
   const handleComplete = () => {
     if (activeMission) {
       consumeFood(activeMission.days * 4); // Consume food from the party
       completeMission();
+    } else {
+      // Campaign mode - just complete the encounter
+      completeMission();
     }
   };
 
-  if (!activeMission) return <div>No active mission</div>;
+  // Show encounter view if we have either an active mission OR an active campaign
+  if (!activeMission && !activeCampaign) {
+    return <div>No active mission or campaign</div>;
+  }
 
   return (
     <div style={{ width: '100%', height: '100%' }}>

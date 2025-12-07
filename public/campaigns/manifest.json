@@ -1,0 +1,17 @@
+{
+  "campaigns": [
+    {
+      "id": "push-test-campaign",
+      "name": "Push Test Campaign",
+      "description": "Test campaign for push mechanics - simple scenario with one crate",
+      "file": "push-test-campaign.json"
+    },
+    {
+      "id": "movement-test-campaign",
+      "name": "Movement Test Campaign",
+      "description": "Simple encounter for testing movement mechanics - minimal obstacles",
+      "file": "movement-test-campaign.json"
+    }
+  ]
+}
+

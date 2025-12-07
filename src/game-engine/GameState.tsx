@@ -42,6 +42,9 @@ export interface Character {
 import { World } from './ecs/World';
 import { Grid } from './grid/Grid';
 import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from './ecs/Component';
+import type { Campaign } from '../campaigns/Campaign';
+import { CampaignLoader } from '../campaigns/CampaignLoader';
+import { EncounterFactory } from '../encounters/EncounterFactory';
 
 // Define the Game State interface
 interface GameState {
@@ -51,6 +54,10 @@ interface GameState {
   party: Character[];
   world?: World;
   grid?: Grid;
+  // Campaign support
+  gameMode?: 'roguelike' | 'campaign';
+  activeCampaign?: Campaign;
+  currentEncounterIndex?: number;
 }
 
 export type StatusMessageType = 'error' | 'success' | 'info';
@@ -73,6 +80,9 @@ interface GameContextType extends GameState {
   getTotalGold: () => number;
   getTotalFood: () => number;
   consumeFood: (amount: number) => void;
+  // Campaign support
+  startCampaign: (campaignId: string, encounterIndex?: number) => Promise<void>;
+  nextEncounter: () => void;
   // Status message
   statusMessage: StatusMessage | null;
   setStatusMessage: (message: StatusMessage | null) => void;
@@ -174,6 +184,42 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const completeMission = () => {
     setState(prev => {
+      // Handle campaign encounter completion
+      if (prev.gameMode === 'campaign' && prev.activeCampaign && prev.currentEncounterIndex !== undefined) {
+        const encounterIndex = prev.currentEncounterIndex;
+        const totalEncounters = prev.activeCampaign.encounters.length;
+        
+        // Check if there are more encounters
+        if (encounterIndex < totalEncounters - 1) {
+          // Load next encounter immediately
+          const nextIndex = encounterIndex + 1;
+          const encounter = prev.activeCampaign.encounters[nextIndex];
+          const { world, grid, party } = EncounterFactory.createFromDefinition(encounter);
+          
+          return {
+            ...prev,
+            currentEncounterIndex: nextIndex,
+            party: party, // Update party (in case characters changed)
+            world,
+            grid,
+            // Stay in MISSION view
+          };
+        } else {
+          // Campaign complete
+          showStatus('Campaign Complete!', 'success', 3000);
+          return {
+            ...prev,
+            activeCampaign: undefined,
+            currentEncounterIndex: undefined,
+            gameMode: undefined,
+            currentView: 'SPLASH',
+            world: undefined,
+            grid: undefined
+          };
+        }
+      }
+      
+      // Handle roguelike mission completion
       if (!prev.activeMission) return prev;
       
       // Add mission to completed list (but don't give reward yet)
@@ -184,6 +230,73 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         currentView: 'TOWN',
         world: undefined,
         grid: undefined
+      };
+    });
+  };
+
+  const startCampaign = async (campaignId: string, encounterIndex: number = 0) => {
+    try {
+      // Load campaign
+      const campaign = await CampaignLoader.loadCampaign(campaignId);
+      
+      // Validate encounter index
+      if (encounterIndex < 0 || encounterIndex >= campaign.encounters.length) {
+        throw new Error(`Invalid encounter index: ${encounterIndex}`);
+      }
+
+      // Get encounter definition
+      const encounter = campaign.encounters[encounterIndex];
+      
+      // Create world, grid, and party from encounter
+      const { world, grid, party } = EncounterFactory.createFromDefinition(encounter);
+
+      setState(prev => ({
+        ...prev,
+        gameMode: 'campaign',
+        activeCampaign: campaign,
+        currentEncounterIndex: encounterIndex,
+        party: party, // Set party from campaign
+        world,
+        grid,
+        currentView: 'MISSION',
+        activeMission: undefined, // Clear any active mission
+      }));
+    } catch (error) {
+      console.error('Failed to start campaign:', error);
+      showStatus(`Failed to load campaign: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+
+  const nextEncounter = () => {
+    setState(prev => {
+      if (prev.gameMode !== 'campaign' || !prev.activeCampaign || prev.currentEncounterIndex === undefined) {
+        return prev;
+      }
+
+      const nextIndex = prev.currentEncounterIndex + 1;
+      if (nextIndex >= prev.activeCampaign.encounters.length) {
+        // Campaign complete
+        return {
+          ...prev,
+          activeCampaign: undefined,
+          currentEncounterIndex: undefined,
+          gameMode: undefined,
+          currentView: 'SPLASH',
+          world: undefined,
+          grid: undefined
+        };
+      }
+
+      // Load next encounter
+      const encounter = prev.activeCampaign.encounters[nextIndex];
+      const { world, grid, party } = EncounterFactory.createFromDefinition(encounter);
+
+      return {
+        ...prev,
+        currentEncounterIndex: nextIndex,
+        party: party, // Update party (in case characters changed)
+        world,
+        grid,
       };
     });
   };
@@ -241,6 +354,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getTotalGold,
       getTotalFood,
       consumeFood,
+      startCampaign,
+      nextEncounter,
       statusMessage,
       setStatusMessage,
       showStatus

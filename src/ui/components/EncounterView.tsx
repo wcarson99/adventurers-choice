@@ -21,7 +21,7 @@ interface PlannedAction {
 }
 
 export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onCompleteMission }) => {
-  const { grid, world, completeMission, consumeFood, party, showStatus } = useGame();
+  const { grid, world, completeMission, consumeFood, party, showStatus, activeCampaign, currentEncounterIndex } = useGame();
   const [tick, setTick] = useState(0); // Force render
   const [phase, setPhase] = useState<PlanningPhase>('movement');
   const [originalPositions, setOriginalPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
@@ -491,8 +491,19 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
         if (allInExit) {
           setTimeout(() => {
-            showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-            if (activeMission) consumeFood(activeMission.days * 4);
+            // Check if this is a campaign or mission
+            if (activeCampaign && currentEncounterIndex !== undefined) {
+              const encounter = activeCampaign.encounters[currentEncounterIndex];
+              const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
+              if (isLastEncounter) {
+                showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
+              } else {
+                showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
+              }
+            } else {
+              showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
+              if (activeMission) consumeFood(activeMission.days * 4);
+            }
             completeMission();
           }, 100);
         }
@@ -739,8 +750,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         overflowY: 'auto',
         boxShadow: '-4px 0 6px rgba(0,0,0,0.3)'
       }}>
-        {/* Mission Title - Compact */}
-        {activeMission && (
+        {/* Mission/Campaign Title - Compact */}
+        {(activeMission || (activeCampaign && currentEncounterIndex !== undefined)) && (
           <div style={{
             marginBottom: '0.75rem',
             paddingBottom: '0.75rem',
@@ -752,7 +763,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               color: theme.colors.accent,
               fontWeight: 'bold'
             }}>
-              {activeMission.title}
+              {activeMission 
+                ? activeMission.title 
+                : activeCampaign && currentEncounterIndex !== undefined
+                  ? `${activeCampaign.name} - ${activeCampaign.encounters[currentEncounterIndex].name}`
+                  : ''}
             </h2>
             <p style={{ 
               fontSize: '0.75rem', 
@@ -761,8 +776,23 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               opacity: 0.8,
               lineHeight: '1.2'
             }}>
-              {activeMission.description}
+              {activeMission 
+                ? activeMission.description 
+                : activeCampaign && currentEncounterIndex !== undefined
+                  ? activeCampaign.encounters[currentEncounterIndex].description
+                  : ''}
             </p>
+            {activeCampaign && currentEncounterIndex !== undefined && (
+              <p style={{ 
+                fontSize: '0.7rem', 
+                margin: '0.25rem 0 0 0', 
+                color: theme.colors.accentLight,
+                opacity: 0.7,
+                fontStyle: 'italic'
+              }}>
+                Encounter {currentEncounterIndex + 1} of {activeCampaign.encounters.length}
+              </p>
+            )}
           </div>
         )}
 

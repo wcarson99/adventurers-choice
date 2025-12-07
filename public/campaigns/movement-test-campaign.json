@@ -26,7 +26,9 @@
               "wis": 2,
               "cha": 2
             },
-            "sprite": "/assets/characters/warrior.png"
+            "sprite": "/assets/characters/warrior.png",
+            "gold": 20,
+            "food": 4
           }
         },
         {
@@ -43,7 +45,9 @@
               "wis": 2,
               "cha": 2
             },
-            "sprite": "/assets/characters/thief.png"
+            "sprite": "/assets/characters/thief.png",
+            "gold": 20,
+            "food": 4
           }
         }
       ],
