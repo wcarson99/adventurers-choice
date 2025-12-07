@@ -1,0 +1,59 @@
+{
+  "id": "movement-test-campaign",
+  "name": "Movement Test Campaign",
+  "description": "Simple encounter for testing movement mechanics - minimal obstacles",
+  "encounters": [
+    {
+      "id": "movement-test-encounter",
+      "name": "Movement Test Encounter",
+      "description": "Open grid for testing character movement",
+      "grid": {
+        "width": 10,
+        "height": 10
+      },
+      "entities": [
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 1 },
+          "properties": {
+            "name": "Hero 1",
+            "archetype": "Warrior",
+            "attributes": {
+              "str": 5,
+              "dex": 2,
+              "con": 5,
+              "int": 2,
+              "wis": 2,
+              "cha": 2
+            },
+            "sprite": "/assets/characters/warrior.png"
+          }
+        },
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 2 },
+          "properties": {
+            "name": "Hero 2",
+            "archetype": "Thief",
+            "attributes": {
+              "str": 5,
+              "dex": 5,
+              "con": 2,
+              "int": 2,
+              "wis": 2,
+              "cha": 2
+            },
+            "sprite": "/assets/characters/thief.png"
+          }
+        }
+      ],
+      "winConditions": [
+        {
+          "type": "allCharactersInExit",
+          "description": "All characters must reach the exit zone"
+        }
+      ]
+    }
+  ]
+}
+

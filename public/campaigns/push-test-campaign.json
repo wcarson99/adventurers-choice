@@ -1,0 +1,51 @@
+{
+  "id": "push-test-campaign",
+  "name": "Push Test Campaign",
+  "description": "Test campaign for push mechanics - simple scenario with one crate",
+  "encounters": [
+    {
+      "id": "push-test-encounter",
+      "name": "Push Test Encounter",
+      "description": "Basic encounter with one crate to test push mechanics",
+      "testInstructions": "AI Tester: Move Warrior from (0,1) to (1,1), then push the crate at (2,1) to the right",
+      "grid": {
+        "width": 10,
+        "height": 10
+      },
+      "entities": [
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 1 },
+          "properties": {
+            "name": "Hero 1",
+            "archetype": "Warrior",
+            "attributes": {
+              "str": 5,
+              "dex": 2,
+              "con": 5,
+              "int": 2,
+              "wis": 2,
+              "cha": 2
+            },
+            "sprite": "/assets/characters/warrior.png"
+          }
+        },
+        {
+          "type": "crate",
+          "position": { "x": 2, "y": 1 },
+          "properties": {
+            "weight": 30,
+            "sprite": "/assets/items/crate.png"
+          }
+        }
+      ],
+      "winConditions": [
+        {
+          "type": "allCharactersInExit",
+          "description": "All characters must reach the exit zone"
+        }
+      ]
+    }
+  ]
+}
+
