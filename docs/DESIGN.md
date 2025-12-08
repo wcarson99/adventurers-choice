@@ -413,7 +413,10 @@ Movement patterns unlock based on DEX score, providing tactical options rather t
 - **Characters:** Simple round shapes, minimal detail, distinct silhouettes
 - **Grid Tiles:** Flat colors with icon overlays (no textures)
 - **UI Panels:** Rounded rectangles, clean typography, ample spacing
-- **Animations:** Simple tweens (slide/fade/scale)
+- **Animations:** Sprite sheet-based animations (see [Animation System](../docs/ANIMATION_SYSTEM.md))
+  - Turn-based: Play once per action (e.g., walking animation per square moved)
+  - Frame-based: 64×64 pixel frames in grid layouts
+  - Simple timing: Fixed frame duration for MVP
 
 ### Asset Requirements (Puzzle Phase)
 

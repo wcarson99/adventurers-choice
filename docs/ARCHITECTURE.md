@@ -134,20 +134,30 @@ src/
   components/         # ECS Components (pure data)
   systems/           # ECS Systems (logic)
   game-engine/       # Core GameEngine, TurnSystem, ActionSystem
+    animations/      # AnimationController, animation state management
   world/             # WorldMap, Node management, Procedural Generation
   encounters/        # Encounter templates and grid logic
   ui/                # React components
     components/      # Reusable UI components
     pages/           # Page-level components
-    canvas/          # Canvas rendering components
+    canvas/          # Canvas rendering components (SpriteRenderer)
   types/             # TypeScript types/interfaces
-  utils/             # Helper functions
+  utils/             # Helper functions (SpriteLoader)
   constants/         # Game constants (attribute names, etc.)
 
 tests/
   e2e/               # Playwright E2E tests
   unit/               # Vitest unit tests
 ```
+
+## Rendering & Animation
+
+The game uses HTML5 Canvas for grid-based rendering with sprite sheet animations. See **[Animation System](ANIMATION_SYSTEM.md)** for detailed architecture.
+
+- **Sprite Sheets**: Grid-based sprite sheets (64×64 frames, variable frame counts)
+- **Animation System**: Turn-based, event-driven animations (play once per action)
+- **Asset Loading**: Preload strategy with caching via `SpriteLoader`
+- **Rendering**: Canvas-based rendering with frame extraction from sprite sheets
 
 ## Game Engine Architecture
 

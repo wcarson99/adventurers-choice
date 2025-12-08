@@ -164,26 +164,32 @@ const CharacterCard: React.FC<{
 };
 
 const CharacterCreation: React.FC = () => {
-  const { setView, setParty } = useGame();
+  const { setView, setParty, party, gameMode, activeCampaign, startCampaign } = useGame();
   const [characters, setCharacters] = useState<Character[]>([]);
 
-  // Initialize characters on mount with deterministic default party
+  // Initialize characters on mount
   useEffect(() => {
-    const defaultArchetypes = ['Warrior', 'Thief', 'Paladin', 'Cleric'];
-    const initialChars: Character[] = defaultArchetypes.map((archetype, i) => {
-      const attrs = getDeterministicAttributes(archetype);
-      return {
-        id: i + 1,
-        name: `Hero ${i + 1}`,
-        attributes: attrs,
-        archetype: archetype,
-        gold: 20,
-        food: 4, // Start with 4 food per character
-        sprite: getSprite(archetype)
-      };
-    });
-    setCharacters(initialChars);
-  }, []);
+    // If we have a campaign with pre-filled party, use those characters
+    if (gameMode === 'campaign' && party.length > 0) {
+      setCharacters(party);
+    } else {
+      // Otherwise use default deterministic party
+      const defaultArchetypes = ['Warrior', 'Thief', 'Paladin', 'Cleric'];
+      const initialChars: Character[] = defaultArchetypes.map((archetype, i) => {
+        const attrs = getDeterministicAttributes(archetype);
+        return {
+          id: i + 1,
+          name: `Hero ${i + 1}`,
+          attributes: attrs,
+          archetype: archetype,
+          gold: 20,
+          food: 4, // Start with 4 food per character
+          sprite: getSprite(archetype)
+        };
+      });
+      setCharacters(initialChars);
+    }
+  }, [gameMode, party]);
 
   const handleUpdate = (updatedChar: Character) => {
     setCharacters(prev => prev.map(c => c.id === updatedChar.id ? updatedChar : c));
@@ -203,9 +209,16 @@ const CharacterCreation: React.FC = () => {
     }));
   };
 
-  const handleEmbark = () => {
+  const handleEmbark = async () => {
     setParty(characters);
-    setView('TOWN');
+    
+    // If this is a campaign, start the first encounter
+    if (gameMode === 'campaign' && activeCampaign) {
+      await startCampaign(activeCampaign.id, 0);
+    } else {
+      // Otherwise go to town (roguelike mode)
+      setView('TOWN');
+    }
   };
 
   return (

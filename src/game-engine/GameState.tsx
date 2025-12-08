@@ -81,6 +81,7 @@ interface GameContextType extends GameState {
   getTotalFood: () => number;
   consumeFood: (amount: number) => void;
   // Campaign support
+  prepareCampaignCharacters: (campaignId: string) => Promise<void>;
   startCampaign: (campaignId: string, encounterIndex?: number) => Promise<void>;
   nextEncounter: () => void;
   // Status message
@@ -234,6 +235,33 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
+  const prepareCampaignCharacters = async (campaignId: string) => {
+    try {
+      // Load campaign
+      const campaign = await CampaignLoader.loadCampaign(campaignId);
+      
+      // Get first encounter to extract characters
+      const encounter = campaign.encounters[0];
+      
+      // Create party from encounter (but don't create world/grid yet)
+      const { party } = EncounterFactory.createFromDefinition(encounter);
+
+      setState(prev => ({
+        ...prev,
+        gameMode: 'campaign',
+        activeCampaign: campaign,
+        currentEncounterIndex: 0,
+        party: party, // Set party from campaign for character creation screen
+        // Don't set world/grid yet - wait until they click "Embark"
+        activeMission: undefined, // Clear any active mission
+      }));
+    } catch (error) {
+      console.error('Failed to prepare campaign:', error);
+      showStatus(`Failed to load campaign: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      throw error;
+    }
+  };
+
   const startCampaign = async (campaignId: string, encounterIndex: number = 0) => {
     try {
       // Load campaign
@@ -354,6 +382,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getTotalGold,
       getTotalFood,
       consumeFood,
+      prepareCampaignCharacters,
       startCampaign,
       nextEncounter,
       statusMessage,
