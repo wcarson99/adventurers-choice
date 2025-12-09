@@ -214,32 +214,10 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
       if (!attrs) return;
 
-      // Get current position and original position
+      // Get current position
       const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
       if (!currentPos) return;
-      const originalPos = originalPositions.get(characterId);
-      if (!originalPos) return;
 
-      // Check if character has already moved
-      const hasMoved = currentPos.x !== originalPos.x || currentPos.y !== originalPos.y;
-      
-      // If character has moved, only allow selection for undo (show original position as only valid move)
-      if (hasMoved) {
-        // If clicking the same character, deselect
-        if (selectedCharacter === characterId) {
-          setSelectedCharacter(null);
-          setValidMoves([]);
-          setSelectedObject(null);
-          setValidPushDirections([]);
-          return;
-        }
-        // Select character but only show original position as valid move (for undo)
-        setSelectedCharacter(characterId);
-        setValidMoves([originalPos]); // Only original position is valid (for undo)
-        return;
-      }
-
-      // Character hasn't moved yet - normal selection
       // If clicking the same character, deselect
       if (selectedCharacter === characterId) {
         setSelectedCharacter(null);
@@ -249,9 +227,22 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         return;
       }
 
-      // Select character and show valid moves from current position
+      // Select character and show valid moves
+      // If character has a planned path, use the last step in the path
+      // Otherwise, use current position
       setSelectedCharacter(characterId);
-      const moves = movementSystem.getValidMoves(world, grid, characterId, { x: currentPos.x, y: currentPos.y }, attrs.dex);
+      const path = movementPlan.getPath(characterId);
+      let fromPos: { x: number; y: number };
+      
+      if (path && path.steps.length > 0) {
+        // Use last step in planned path
+        fromPos = path.steps[path.steps.length - 1];
+      } else {
+        // No path planned, use current position
+        fromPos = { x: currentPos.x, y: currentPos.y };
+      }
+      
+      const moves = movementSystem.getValidMoves(world, grid, characterId, fromPos, attrs.dex);
       setValidMoves(moves);
     } else if (phase === 'skill') {
       // In skill phase, select character for action planning
@@ -337,15 +328,17 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
         if (!attrs) return;
         
-        // Get the position to move from (last step in path, or current position)
+        // Get the position to move from
+        // If character has a planned path, use the last step in the path
+        // Otherwise, use current position
         const path = movementPlan.getPath(selectedCharacter);
         let fromPos: { x: number; y: number };
         
         if (path && path.steps.length > 0) {
-          // Moving from the last step in the path
+          // Use last step in planned path
           fromPos = path.steps[path.steps.length - 1];
         } else {
-          // Moving from current position
+          // No path planned, use current position
           const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
           if (!currentPos) return;
           fromPos = { x: currentPos.x, y: currentPos.y };
@@ -647,10 +640,10 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           return p && p.x === pos.x && p.y === pos.y;
         })();
         
-        // Check if this is the original position (for undo hint in movement phase)
-        const isOriginalPosition = phase === 'movement' && selectedCharacter && (() => {
-          const originalPos = originalPositions.get(selectedCharacter);
-          return originalPos && originalPos.x === pos.x && originalPos.y === pos.y;
+        // Check if this is the current position (where character is now, after any executed steps)
+        const isCurrentPosition = phase === 'movement' && selectedCharacter && (() => {
+          const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+          return currentPos && currentPos.x === pos.x && currentPos.y === pos.y;
         })();
         
         // Check if this is a selected object (crate)
@@ -722,7 +715,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 : grid.isExitZone(pos.x, pos.y)
                 ? 'rgba(144, 238, 144, 0.3)' // Light green overlay for exit
                 : 'transparent',
-              opacity: isOriginalPosition ? 0.5 : 1,
+              opacity: isCurrentPosition ? 0.5 : 1,
               border: isSelectedCharacter 
                 ? '3px solid #ff8c00'
                 : isPathStep
@@ -769,8 +762,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 {renderable.char}
               </div>
             ) : null}
-            {/* Show original position hint if selected character has moved */}
-            {isOriginalPosition && phase === 'movement' && selectedCharacter && (
+            {/* Show current position hint */}
+            {isCurrentPosition && phase === 'movement' && selectedCharacter && (
               <div style={{
                 position: 'absolute',
                 top: '2px',
@@ -781,7 +774,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 padding: '2px 4px',
                 borderRadius: '2px'
               }}>
-                Original
+                Start
               </div>
             )}
             {/* Show step number for path steps */}
@@ -1047,6 +1040,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         movementSystem.moveCharacter(world, path.characterId, nextStep);
                         path.currentStepIndex++;
                         
+                        // Update original position to new position (executed step becomes current position)
+                        originalPositions.set(path.characterId, { x: nextStep.x, y: nextStep.y });
+                        
                         // Update status
                         if (path.currentStepIndex >= path.steps.length) {
                           path.status = 'complete';
@@ -1129,32 +1125,39 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               );
             })()}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {selectedCharacter && movementPlan.getPath(selectedCharacter)?.steps.length > 0 && (
-                <button
-                  onClick={() => {
-                    // Remove last step from selected character's path
-                    if (movementPlan.removeLastStep(selectedCharacter)) {
-                      // Update valid moves from the new last position (or current position)
-                      const path = movementPlan.getPath(selectedCharacter);
-                      const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
-                      if (attrs) {
-                        let fromPos: { x: number; y: number };
-                        if (path && path.steps.length > 0) {
-                          fromPos = path.steps[path.steps.length - 1];
-                        } else {
-                          const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
-                          if (currentPos) {
-                            fromPos = { x: currentPos.x, y: currentPos.y };
+              {selectedCharacter && (() => {
+                const path = movementPlan.getPath(selectedCharacter);
+                // Only show undo if there are planned steps that haven't been executed yet
+                const unexecutedSteps = path && path.steps.length > path.currentStepIndex;
+                if (!unexecutedSteps) return null;
+                
+                return (
+                  <button
+                    onClick={() => {
+                      // Remove last step from selected character's path (only unexecuted steps)
+                      if (movementPlan.removeLastStep(selectedCharacter)) {
+                        // Update valid moves from the new last position (or current position)
+                        const updatedPath = movementPlan.getPath(selectedCharacter);
+                        const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
+                        if (attrs) {
+                          let fromPos: { x: number; y: number };
+                          if (updatedPath && updatedPath.steps.length > 0) {
+                            fromPos = updatedPath.steps[updatedPath.steps.length - 1];
                           } else {
-                            return;
+                            const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+                            if (currentPos) {
+                              fromPos = { x: currentPos.x, y: currentPos.y };
+                            } else {
+                              return;
+                            }
                           }
+                          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, fromPos, attrs.dex);
+                          setValidMoves(moves);
                         }
-                        const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, fromPos, attrs.dex);
-                        setValidMoves(moves);
+                        setPathUpdateTrigger(t => t + 1);
+                        setTick(t => t + 1);
                       }
-                      setTick(t => t + 1);
-                    }
-                  }}
+                    }}
                   style={{
                     flex: 1,
                     padding: '0.5rem',
@@ -1168,9 +1171,10 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                     minWidth: '120px'
                   }}
                 >
-                  Undo Last Step
-                </button>
-              )}
+                    Undo Last Step
+                  </button>
+                );
+              })()}
               <button
                 onClick={() => {
                   // Clear all paths
