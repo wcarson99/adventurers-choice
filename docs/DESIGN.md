@@ -287,36 +287,15 @@ Encounters are categorized by player agency and resolution method:
 
 ### 🚶 Movement Mechanics
 
-**Base Movement:**
-- All characters can move to an adjacent square (free, no stamina cost)
-- Movement is a free action, separate from skill-based actions
+**See [FREE_ACTIONS.md](FREE_ACTIONS.md) for detailed movement system documentation.**
 
-**Free Actions:**
-- **Move:** Movement based on DEX patterns (see below)
-- **Wait:** Do nothing (0 stamina, free action)
-- **Focus:** Planned for future (see BACKLOG.md) - Free action that grants bonus to next skill action, scales with `max(INT, WIS)`
-
-**DEX-Based Movement Patterns:**
-
-Movement patterns unlock based on DEX score, providing tactical options rather than just distance:
-
-| DEX Range | Movement Pattern | Description |
-|:---------:|:----------------:|:-----------|
-| **1-3** | **Horizontal/Vertical** | Can move 1 square: ↑ ↓ ← → (orthogonal only) |
-| **4-6** | **Add Diagonal** | Can move 1 square in any direction: ↑ ↓ ← → ↗ ↘ ↖ ↙ |
-| **7-9** | **Add 2-Square Orthogonal** | Can move 1 square any direction OR 2 squares: ↑↑ ↓↓ ←← →→ |
-| **10+** | **Extended Patterns** | Additional patterns TBD (e.g., 2-square diagonal, knight moves, etc.) |
-
-**Movement Rules:**
-- Movement is free (no stamina cost)
-- One movement per character per turn (pattern based on DEX)
-- Cannot move through occupied squares (unless specified by special abilities)
-- 2-square moves require clear path (cannot move through obstacles)
-
-**Design Philosophy:**
-- DEX provides tactical movement options, not just speed
-- Higher DEX unlocks more positioning flexibility
-- Movement patterns create interesting puzzle-solving opportunities
+**Summary:**
+- Movement is a **free action** (no stamina cost)
+- Uses **manual path planning** with **step-by-step execution**
+- DEX-based movement patterns unlock tactical options (orthogonal, diagonal, 2-square moves)
+- Characters plan full paths, then execute step-by-step via "Execute Free Moves" button
+- State changes apply after each step, affecting subsequent movement
+- Full tactical control with simple iteration (click through complex movements)
 
 ### 🌳 Progression System: Consumable Attribute Points (AP)
 
@@ -460,14 +439,20 @@ Movement patterns unlock based on DEX score, providing tactical options rather t
 
 **Phase 1: Free Action Planning (Movement)**
 1. **Movement Planning:** Player plans movement for all characters
-   - Click character → Click destination (ghost/preview position shown)
+   - Click character → Click tiles in sequence to build path (manual path planning)
    - Movement pattern based on character's DEX (orthogonal, diagonal, 2-square)
-   - All planned movements shown as ghost positions
+   - Show path preview (line connecting tiles with step numbers)
+   - Prevent conflicts: Cannot select squares that would be occupied at that step
 2. **Visual Feedback:** 
-   - Ghost/preview positions for all planned movements
-   - Highlight valid movement options based on DEX
-   - Show movement pattern (arrows/lines)
-3. **Navigation:** Continue to Action Phase or Clear All
+   - Selected character: Full path line with step numbers
+   - All characters: Show start positions (grayed), end positions (full color), current step position (highlighted)
+   - Occupied squares: Grayed out (cannot select)
+3. **Execution:** 
+   - "Execute Free Moves" button executes next step for all characters
+   - Click repeatedly to step through entire movement
+   - State changes apply after each step
+   - Characters who complete or get blocked stop moving
+4. **Navigation:** Continue to Action Phase or Clear All
 
 **Phase 2: Skill Action Planning**
 1. **Action Planning:** Player plans skill-based actions for all characters
@@ -483,14 +468,15 @@ Movement patterns unlock based on DEX score, providing tactical options rather t
    - Show predicted stamina costs
 
 **Phase 3: Execution**
-1. **Commit:** "Execute Turn" button commits all movements and actions
-2. **Execution Order:**
-   - All movements execute first (simultaneously or in order)
-   - Then all actions execute (in player-chosen order or initiative-based)
-3. **Playback:**
+1. **Movement Execution:** "Execute Free Moves" button executes movements step-by-step
+   - Each click advances all characters one step in their planned paths
+   - State changes apply after each step
+   - Characters stop if step becomes invalid (blocked, state change, etc.)
+2. **Action Execution:** After movements complete, execute skill-based actions
+   - Actions execute in player-chosen order or initiative-based
    - Sequential animation (1-5 seconds per action, TBD)
    - Playback controls: Speed toggle (1x/2x/4x), Skip to End, Pause
-4. **Failure Handling:** If one character fails an action, all other characters still attempt their actions
+3. **Failure Handling:** If one character fails an action, all other characters still attempt their actions
 
 #### Action Queue Visualization
 
@@ -605,6 +591,23 @@ Movement patterns unlock based on DEX score, providing tactical options rather t
   3. Execute Phase: Commit and execute all movements, then all actions
 - **Decision:** Pushing mechanics: Stamina cost = `Math.ceil(objectWeight / STR)`, minimum 1.
 - **Rationale:** Movement patterns provide tactical depth rather than just speed. Two-phase planning allows players to see board state before committing actions, with flexibility to adjust.
+
+### [Date TBD] - Movement System Redesign
+
+- **Problem:** Original tap-tap movement system was tedious (2 taps per move, no path planning)
+- **Decision:** Manual path planning with step-by-step execution
+- **Mechanic:**
+  - Planning: Click character → click tiles in sequence to build path
+  - Execution: "Execute Free Moves" button executes next step for all characters
+  - Click repeatedly to step through entire movement
+  - State changes apply after each step
+- **Rationale:**
+  - Full tactical control (plan exact paths for all characters)
+  - Simple execution (one button, click through complex movements)
+  - Handles state changes (step-by-step validation prevents invalid states)
+  - Works for all DEX levels (low DEX can plan alternating moves)
+  - Easy iteration (click through complex movements quickly)
+- **See:** [FREE_ACTIONS.md](FREE_ACTIONS.md) for detailed documentation
 
 ### [Dec 1, 2025 - Grid Structure and Pushing Mechanics]
 

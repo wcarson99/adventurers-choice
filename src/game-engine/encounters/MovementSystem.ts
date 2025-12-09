@@ -117,6 +117,67 @@ export class MovementSystem {
   }
 
   /**
+   * Validate if a path step is valid for a character's DEX
+   * Checks if the step follows a valid movement pattern from the current position
+   */
+  validatePathStep(
+    world: World,
+    grid: Grid,
+    characterId: number,
+    fromPos: GridPosition,
+    toPos: GridPosition,
+    dex: number
+  ): boolean {
+    // Calculate the delta
+    const dx = toPos.x - fromPos.x;
+    const dy = toPos.y - fromPos.y;
+
+    // Check if destination is valid
+    if (!grid.isValid(toPos.x, toPos.y)) return false;
+
+    // Check if destination is a wall
+    if (grid.isWall(toPos.x, toPos.y)) return false;
+
+    // Check if destination is occupied by another character
+    if (this.isOccupied(world, grid, toPos.x, toPos.y, characterId)) return false;
+
+    // Get valid movement patterns
+    const patterns = this.getMovementPatterns(dex);
+
+    // Check if the delta matches any valid pattern
+    const matchesPattern = patterns.some(pattern => pattern.dx === dx && pattern.dy === dy);
+
+    if (!matchesPattern) return false;
+
+    // For 2-square moves, check that the path is clear
+    if (Math.abs(dx) === 2 || Math.abs(dy) === 2) {
+      const midX = fromPos.x + Math.sign(dx);
+      const midY = fromPos.y + Math.sign(dy);
+      
+      // Check if middle square is blocked
+      if (grid.isWall(midX, midY) || this.isOccupied(world, grid, midX, midY, characterId)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if character can move from position A to B (respects DEX patterns)
+   */
+  canMoveFromTo(
+    world: World,
+    grid: Grid,
+    characterId: number,
+    fromPos: GridPosition,
+    toPos: GridPosition,
+    dex: number
+  ): boolean {
+    return this.validatePathStep(world, grid, characterId, fromPos, toPos, dex);
+  }
+
+  /**
    * Move a character to a new position (free action, no stamina cost)
    */
   moveCharacter(

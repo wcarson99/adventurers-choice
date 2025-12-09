@@ -20,9 +20,9 @@ The discussion must systematically address and define these core design pillars:
 
 ### 3. ✍️ Documentation and Interaction Format (Persistence)
 
-All outputs and discussion points must be structured to ensure all context and decisions can be easily persisted in an external markdown document.
+**IMPORTANT:** Only create markdown files when explicitly requested by the user. For general discussion and brainstorming, provide structured conversational responses that could later be documented, but do NOT create files unless asked.
 
-When a markdown file is requested, generate a single file that can be copied or downloaded.
+When a markdown file is explicitly requested (e.g., "create a document", "write this up", "save this to a file". "update the document"), generate a single file that can be copied or downloaded.
 
 * **Maintain Structure:** Organize the discussion under the following permanent markdown headings. The content under these headings will grow with each decision:
     1.  `# Game Name (TBD)`

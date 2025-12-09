@@ -5,6 +5,7 @@ import { theme } from '../styles/theme';
 import { Grid } from '../../game-engine/grid/Grid';
 import { MovementSystem } from '../../game-engine/encounters/MovementSystem';
 import { PushSystem } from '../../game-engine/encounters/PushSystem';
+import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string };
@@ -33,6 +34,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const [validMoves, setValidMoves] = useState<Array<{ x: number; y: number }>>([]);
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
   const [validPushDirections, setValidPushDirections] = useState<Array<{ dx: number; dy: number; staminaCost: number }>>([]);
+  const [movementPlan] = useState<MovementPlan>(() => new MovementPlan());
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
 
@@ -58,9 +60,14 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const getInstructions = (): string => {
     if (phase === 'movement') {
       if (selectedCharacter) {
-        return '👆 Click a green tile to move. Click original position to undo.';
+        const path = movementPlan.getPath(selectedCharacter);
+        const pathSteps = path ? path.steps.length : 0;
+        if (pathSteps > 0) {
+          return `👆 Click green tiles to add steps (${pathSteps} planned). Click "Undo" to remove last step.`;
+        }
+        return '👆 Click a green tile to plan movement path.';
       }
-      return '👆 Click a character to select, then click a green tile to move them.';
+      return '👆 Click a character to select, then click green tiles to plan their path.';
     }
     if (phase === 'skill') {
       if (selectedCharacter) {
@@ -305,38 +312,49 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   };
 
   const handleTileClick = (x: number, y: number) => {
-    // Movement phase: move characters immediately
+    // Movement phase: plan paths instead of moving immediately
     if (phase === 'movement') {
-      // Check if clicking on original position to undo (restore to original)
+      // If character is selected and this is a valid move, add to path (don't move yet)
       if (selectedCharacter !== null) {
-        const originalPos = originalPositions.get(selectedCharacter);
-        if (originalPos && originalPos.x === x && originalPos.y === y) {
-          // Restore character to original position
-          movementSystem.moveCharacter(world, selectedCharacter, originalPos);
-          setSelectedCharacter(null);
-          setValidMoves([]);
-          setTick(t => t + 1); // Trigger re-render
-          return;
-        }
-      }
-
-      // If character is selected and this is a valid move, move immediately
-      if (selectedCharacter !== null) {
-        const isValidMove = validMoves.some(move => move.x === x && move.y === y);
+        const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
+        if (!attrs) return;
         
-        if (isValidMove) {
-          // Check for overlap before moving
-          if (wouldOverlap(x, y, selectedCharacter)) {
-            showStatus('Cannot move: another character is already there', 'error');
-            return;
-          }
+        // Get the position to move from (last step in path, or current position)
+        const path = movementPlan.getPath(selectedCharacter);
+        let fromPos: { x: number; y: number };
+        
+        if (path && path.steps.length > 0) {
+          // Moving from the last step in the path
+          fromPos = path.steps[path.steps.length - 1];
+        } else {
+          // Moving from current position
+          const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+          if (!currentPos) return;
+          fromPos = { x: currentPos.x, y: currentPos.y };
+        }
+        
+        // Validate the step using MovementSystem
+        const isValidStep = movementSystem.canMoveFromTo(
+          world,
+          grid,
+          selectedCharacter,
+          fromPos,
+          { x, y },
+          attrs.dex
+        );
+        
+        if (isValidStep) {
+          // Add step to path
+          movementPlan.addStep(selectedCharacter, { x, y });
           
-          // Move the character immediately
-          movementSystem.moveCharacter(world, selectedCharacter, { x, y });
-          setSelectedCharacter(null);
-          setValidMoves([]);
-          setTick(t => t + 1); // Trigger re-render
+          // Update valid moves for next step (from the newly added position)
+          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, { x, y }, attrs.dex);
+          setValidMoves(moves);
+          
+          setTick(t => t + 1); // Trigger re-render to show path preview
           return;
+        } else {
+          showStatus('Invalid move: not a valid movement pattern', 'error');
         }
       }
 
@@ -634,6 +652,30 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           if (!objPos) return false;
           return pos.x === objPos.x + push.dx && pos.y === objPos.y + push.dy;
         });
+        
+        // Check if this tile is part of a planned path
+        const isPathStep = phase === 'movement' && (() => {
+          // Check all characters' paths
+          const allPaths = movementPlan.getAllPaths();
+          for (const path of allPaths) {
+            const stepIndex = path.steps.findIndex(step => step.x === pos.x && step.y === pos.y);
+            if (stepIndex >= 0) {
+              return { path, stepIndex: stepIndex + 1 }; // Step numbers start at 1
+            }
+          }
+          return null;
+        })();
+        
+        // Check if this is the start position of a planned path
+        const isPathStart = phase === 'movement' && selectedCharacter && (() => {
+          const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+          const path = movementPlan.getPath(selectedCharacter);
+          return currentPos && 
+                 path && 
+                 path.steps.length > 0 &&
+                 currentPos.x === pos.x && 
+                 currentPos.y === pos.y;
+        })();
 
         return (
           <div
@@ -652,6 +694,10 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               backgroundPosition: 'center',
               backgroundColor: isSelectedCharacter
                 ? 'rgba(255, 215, 0, 0.3)' // Gold overlay for selected character
+                : isPathStep
+                ? 'rgba(100, 149, 237, 0.4)' // Cornflower blue overlay for path steps
+                : isPathStart
+                ? 'rgba(255, 215, 0, 0.2)' // Light gold overlay for path start
                 : isSelectedObject
                 ? 'rgba(255, 165, 0, 0.3)' // Orange overlay for selected crate
                 : isValidPushDest
@@ -666,6 +712,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               opacity: isOriginalPosition ? 0.5 : 1,
               border: isSelectedCharacter 
                 ? '3px solid #ff8c00'
+                : isPathStep
+                ? '2px solid #6495ed' // Cornflower blue border for path steps
                 : isSelectedObject
                 ? '3px solid #ff6347'
                 : isValidPushDest
@@ -721,6 +769,27 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 borderRadius: '2px'
               }}>
                 Original
+              </div>
+            )}
+            {/* Show step number for path steps */}
+            {isPathStep && !renderable && (
+              <div style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                fontSize: '0.7rem',
+                fontWeight: 'bold',
+                color: '#fff',
+                backgroundColor: 'rgba(100, 149, 237, 0.8)',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid #fff'
+              }}>
+                {isPathStep.stepIndex}
               </div>
             )}
             {showTileCoordinates && !renderable && (
@@ -838,10 +907,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 {playerCharacters.map(charId => {
                   const charIndex = Array.from(world.getAllEntities()).indexOf(charId);
                   const charName = party[charIndex]?.name || `C${charIndex + 1}`;
-                  const currentPos = world.getComponent<PositionComponent>(charId, 'Position');
-                  const originalPos = originalPositions.get(charId);
-                  const hasMoved = originalPos && currentPos && 
-                    (originalPos.x !== currentPos.x || originalPos.y !== currentPos.y);
+                  const path = movementPlan.getPath(charId);
+                  const pathSteps = path ? path.steps.length : 0;
                   const isSelected = selectedCharacter === charId;
                   
                   return (
@@ -861,14 +928,14 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         cursor: 'pointer'
                       }}
                       onClick={() => handleCharacterClick(charId)}
-                      title={hasMoved && currentPos ? `Move: (${originalPos.x},${originalPos.y}) → (${currentPos.x},${currentPos.y})` : 'Wait'}
+                      title={pathSteps > 0 ? `${pathSteps} step${pathSteps !== 1 ? 's' : ''} planned` : 'No path planned'}
                     >
                       <div style={{ fontWeight: 'bold', marginBottom: '0.15rem', fontSize: '0.8rem' }}>
                         {charName}
                       </div>
-                      {hasMoved ? (
+                      {pathSteps > 0 ? (
                         <div style={{ fontSize: '0.7rem', opacity: 0.9 }}>
-                          ✓ Move
+                          {pathSteps} step{pathSteps !== 1 ? 's' : ''}
                         </div>
                       ) : (
                         <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
@@ -888,53 +955,158 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           <div style={{
             marginBottom: '0.75rem',
             display: 'flex',
+            flexDirection: 'column',
             gap: '0.5rem'
           }}>
-            <button
-              onClick={() => {
-                // Restore all characters to original positions
-                originalPositions.forEach((originalPos, charId) => {
-                  movementSystem.moveCharacter(world, charId, originalPos);
-                });
-                setSelectedCharacter(null);
-                setValidMoves([]);
-                setTick(t => t + 1); // Trigger re-render
-              }}
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                fontSize: '0.85rem',
-                backgroundColor: theme.colors.cardBackground,
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.imageBorder}`,
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Clear All Movements
-            </button>
-            <button
-              onClick={() => {
-                // Characters are already in their new positions, just transition to skill phase
-                setPhase('skill');
-                setSelectedCharacter(null);
-                setValidMoves([]);
-              }}
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                fontSize: '0.85rem',
-                backgroundColor: theme.colors.success,
-                color: theme.colors.text,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Plan Skills
-            </button>
+            {movementPlan.hasAnyPath() && (() => {
+              // Check if there are any paths that can be executed (ready or executing)
+              const executablePaths = movementPlan.getAllPaths().filter(path => 
+                path.steps.length > 0 && 
+                (path.status === 'ready' || path.status === 'executing') &&
+                path.currentStepIndex < path.steps.length
+              );
+              
+              if (executablePaths.length === 0) return null;
+              
+              return (
+                <button
+                  onClick={() => {
+                    // Execute next step for all characters with executable paths
+                    executablePaths.forEach(path => {
+                      const nextStep = path.steps[path.currentStepIndex];
+                      if (nextStep) {
+                        // Move character to next step
+                        movementSystem.moveCharacter(world, path.characterId, nextStep);
+                        path.currentStepIndex++;
+                        
+                        // Update status
+                        if (path.currentStepIndex >= path.steps.length) {
+                          path.status = 'complete';
+                        } else {
+                          path.status = 'executing';
+                        }
+                      }
+                    });
+                    
+                    setTick(t => t + 1); // Trigger re-render
+                  }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  fontSize: '0.85rem',
+                  backgroundColor: theme.colors.accent,
+                  color: theme.colors.text,
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                  Execute Free Moves
+                </button>
+              );
+            })()}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {selectedCharacter && movementPlan.getPath(selectedCharacter)?.steps.length > 0 && (
+                <button
+                  onClick={() => {
+                    // Remove last step from selected character's path
+                    if (movementPlan.removeLastStep(selectedCharacter)) {
+                      // Update valid moves from the new last position (or current position)
+                      const path = movementPlan.getPath(selectedCharacter);
+                      const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
+                      if (attrs) {
+                        let fromPos: { x: number; y: number };
+                        if (path && path.steps.length > 0) {
+                          fromPos = path.steps[path.steps.length - 1];
+                        } else {
+                          const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+                          if (currentPos) {
+                            fromPos = { x: currentPos.x, y: currentPos.y };
+                          } else {
+                            return;
+                          }
+                        }
+                        const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, fromPos, attrs.dex);
+                        setValidMoves(moves);
+                      }
+                      setTick(t => t + 1);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '0.5rem',
+                    fontSize: '0.85rem',
+                    backgroundColor: theme.colors.cardBackground,
+                    color: theme.colors.text,
+                    border: `1px solid ${theme.colors.imageBorder}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    minWidth: '120px'
+                  }}
+                >
+                  Undo Last Step
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  // Clear all paths
+                  movementPlan.clearAll();
+                  // Restore all characters to original positions
+                  originalPositions.forEach((originalPos, charId) => {
+                    movementSystem.moveCharacter(world, charId, originalPos);
+                  });
+                  setSelectedCharacter(null);
+                  setValidMoves([]);
+                  setTick(t => t + 1); // Trigger re-render
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  fontSize: '0.85rem',
+                  backgroundColor: theme.colors.cardBackground,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.imageBorder}`,
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  minWidth: '120px'
+                }}
+              >
+                Clear All Movements
+              </button>
+              <button
+                onClick={() => {
+                  // Check if all paths are complete or no paths planned
+                  const allComplete = movementPlan.getAllPaths().every(path => 
+                    path.status === 'complete' || path.steps.length === 0
+                  );
+                  
+                  if (allComplete || !movementPlan.hasAnyPath()) {
+                    // Transition to skill phase
+                    setPhase('skill');
+                    setSelectedCharacter(null);
+                    setValidMoves([]);
+                  } else {
+                    showStatus('Complete all movement paths before proceeding', 'error');
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem',
+                  fontSize: '0.85rem',
+                  backgroundColor: theme.colors.success,
+                  color: theme.colors.text,
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Plan Skills
+              </button>
+            </div>
           </div>
         )}
 
