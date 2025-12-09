@@ -6,6 +6,7 @@ import { Grid } from '../../game-engine/grid/Grid';
 import { MovementSystem } from '../../game-engine/encounters/MovementSystem';
 import { PushSystem } from '../../game-engine/encounters/PushSystem';
 import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
+import { ConflictDetector } from '../../game-engine/encounters/ConflictDetector';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string };
@@ -35,6 +36,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
   const [validPushDirections, setValidPushDirections] = useState<Array<{ dx: number; dy: number; staminaCost: number }>>([]);
   const [movementPlan] = useState<MovementPlan>(() => new MovementPlan());
+  const [pathUpdateTrigger, setPathUpdateTrigger] = useState(0); // Force re-render when paths change
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
 
@@ -314,6 +316,22 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const handleTileClick = (x: number, y: number) => {
     // Movement phase: plan paths instead of moving immediately
     if (phase === 'movement') {
+      // First, check if clicking on a character to select/deselect
+      const entities = world.getAllEntities();
+      const clickedEntity = entities.find(id => {
+        const r = world.getComponent<RenderableComponent>(id, 'Renderable');
+        const attrs = world.getComponent<AttributesComponent>(id, 'Attributes');
+        if (!r || !attrs) return false;
+        
+        const currentPos = world.getComponent<PositionComponent>(id, 'Position');
+        return currentPos && currentPos.x === x && currentPos.y === y && r.color === theme.colors.accent;
+      });
+
+      if (clickedEntity) {
+        handleCharacterClick(clickedEntity);
+        return;
+      }
+      
       // If character is selected and this is a valid move, add to path (don't move yet)
       if (selectedCharacter !== null) {
         const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
@@ -347,6 +365,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           // Add step to path
           movementPlan.addStep(selectedCharacter, { x, y });
           
+          // Trigger re-render to update button state
+          setPathUpdateTrigger(t => t + 1);
+          
           // Update valid moves for next step (from the newly added position)
           const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, { x, y }, attrs.dex);
           setValidMoves(moves);
@@ -355,24 +376,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           return;
         } else {
           showStatus('Invalid move: not a valid movement pattern', 'error');
+          return; // IMPORTANT: Return to prevent falling through to legacy code
         }
       }
-
-      // Check if clicking on a character to select (always use current position)
-      const entities = world.getAllEntities();
-      const clickedEntity = entities.find(id => {
-        const r = world.getComponent<RenderableComponent>(id, 'Renderable');
-        const attrs = world.getComponent<AttributesComponent>(id, 'Attributes');
-        if (!r || !attrs) return false;
-        
-        const currentPos = world.getComponent<PositionComponent>(id, 'Position');
-        return currentPos && currentPos.x === x && currentPos.y === y && r.color === theme.colors.accent;
-      });
-
-      if (clickedEntity) {
-        handleCharacterClick(clickedEntity);
-        return;
-      }
+      
+      // No character selected and not clicking on a character - do nothing
       return;
     }
 
@@ -424,7 +432,12 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       return;
     }
 
-    // Legacy code for executing phase
+    // Legacy code for executing phase (should not run in movement or skill phase)
+    // This code is for backward compatibility with old execution model
+    if (phase === 'movement' || phase === 'skill') {
+      return; // Should have been handled above, but guard against fall-through
+    }
+    
     const entities = world.getAllEntities();
     const clickedEntity = entities.find(id => {
       const p = world.getComponent<PositionComponent>(id, 'Position');
@@ -959,14 +972,69 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
             gap: '0.5rem'
           }}>
             {movementPlan.hasAnyPath() && (() => {
-              // Check if there are any paths that can be executed (ready or executing)
-              const executablePaths = movementPlan.getAllPaths().filter(path => 
+              // Force recalculation when paths change (use pathUpdateTrigger)
+              const _ = pathUpdateTrigger;
+              
+              // Check if there are any paths that can be executed (ready, executing, or conflicting)
+              const allPaths = movementPlan.getAllPaths();
+              const executablePaths = allPaths.filter(path => 
                 path.steps.length > 0 && 
-                (path.status === 'ready' || path.status === 'executing') &&
                 path.currentStepIndex < path.steps.length
               );
               
               if (executablePaths.length === 0) return null;
+              
+              // Validate next step for all characters
+              let hasInvalidNextStep = false;
+              const invalidReasons: string[] = [];
+              
+              executablePaths.forEach(path => {
+                const nextStep = path.steps[path.currentStepIndex];
+                if (!nextStep) return;
+                
+                // Get character's current position (where they are now)
+                const currentPos = world.getComponent<PositionComponent>(path.characterId, 'Position');
+                if (!currentPos) return;
+                
+                const attrs = world.getComponent<AttributesComponent>(path.characterId, 'Attributes');
+                if (!attrs) return;
+                
+                // Check if next step is valid (movement pattern)
+                const isValidMove = movementSystem.canMoveFromTo(
+                  world,
+                  grid,
+                  path.characterId,
+                  { x: currentPos.x, y: currentPos.y },
+                  nextStep,
+                  attrs.dex
+                );
+                
+                if (!isValidMove) {
+                  hasInvalidNextStep = true;
+                  invalidReasons.push('Invalid movement pattern');
+                  return;
+                }
+                
+                // Check for conflicts with other characters' next steps
+                // Check if any other character's next step is the same position
+                const conflictingPath = executablePaths.find(otherPath => {
+                  if (otherPath.characterId === path.characterId) return false; // Skip self
+                  if (otherPath.currentStepIndex >= otherPath.steps.length) return false; // No next step
+                  const otherNextStep = otherPath.steps[otherPath.currentStepIndex];
+                  return otherNextStep.x === nextStep.x && otherNextStep.y === nextStep.y;
+                });
+                
+                if (conflictingPath) {
+                  hasInvalidNextStep = true;
+                  invalidReasons.push('Square will be occupied');
+                  movementPlan.setPathStatus(path.characterId, 'conflicting');
+                } else {
+                  // Clear conflicting status if step is now valid
+                  if (path.status === 'conflicting') {
+                    movementPlan.setPathStatus(path.characterId, 'ready');
+                  }
+                }
+              });
               
               return (
                 <button
@@ -988,21 +1056,75 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                       }
                     });
                     
+                    // After execution, re-validate next steps for all characters
+                    const remainingPaths = movementPlan.getAllPaths().filter(p => 
+                      p.steps.length > 0 && p.currentStepIndex < p.steps.length
+                    );
+                    
+                    remainingPaths.forEach(path => {
+                      const nextStep = path.steps[path.currentStepIndex];
+                      if (!nextStep) return;
+                      
+                      const currentPos = world.getComponent<PositionComponent>(path.characterId, 'Position');
+                      if (!currentPos) return;
+                      
+                      const attrs = world.getComponent<AttributesComponent>(path.characterId, 'Attributes');
+                      if (!attrs) return;
+                      
+                      // Validate next step
+                      const isValidMove = movementSystem.canMoveFromTo(
+                        world,
+                        grid,
+                        path.characterId,
+                        { x: currentPos.x, y: currentPos.y },
+                        nextStep,
+                        attrs.dex
+                      );
+                      
+                      if (!isValidMove) {
+                        movementPlan.setPathStatus(path.characterId, 'blocked');
+                        return;
+                      }
+                      
+                      // Check for conflicts with other characters' next steps
+                      const allPathsAfterExecution = movementPlan.getAllPaths();
+                      const otherExecutablePaths = allPathsAfterExecution.filter(p => 
+                        p.characterId !== path.characterId &&
+                        p.steps.length > 0 && 
+                        p.currentStepIndex < p.steps.length
+                      );
+                      
+                      const conflictingPath = otherExecutablePaths.find(otherPath => {
+                        const otherNextStep = otherPath.steps[otherPath.currentStepIndex];
+                        return otherNextStep.x === nextStep.x && otherNextStep.y === nextStep.y;
+                      });
+                      
+                      if (conflictingPath) {
+                        movementPlan.setPathStatus(path.characterId, 'conflicting');
+                      } else {
+                        movementPlan.setPathStatus(path.characterId, 'ready');
+                      }
+                    });
+                    
                     setTick(t => t + 1); // Trigger re-render
+                    setPathUpdateTrigger(t => t + 1); // Update button state
                   }}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  fontSize: '0.85rem',
-                  backgroundColor: theme.colors.accent,
-                  color: theme.colors.text,
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                  Execute Free Moves
+                  disabled={hasInvalidNextStep}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    fontSize: '0.85rem',
+                    backgroundColor: hasInvalidNextStep ? theme.colors.imageBackground : theme.colors.accent,
+                    color: theme.colors.text,
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: hasInvalidNextStep ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    opacity: hasInvalidNextStep ? 0.6 : 1
+                  }}
+                  title={hasInvalidNextStep ? `Cannot execute: ${invalidReasons.join(', ')}` : 'Execute next step for all characters'}
+                >
+                  Execute Free Moves{hasInvalidNextStep ? ' (Invalid)' : ''}
                 </button>
               );
             })()}

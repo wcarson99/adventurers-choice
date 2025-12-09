@@ -38,16 +38,19 @@ Movement patterns unlock based on DEX score, providing tactical options rather t
 6. Repeat for all characters
 
 **Occupancy Validation:**
-- When planning step N, check if target square is occupied at step N by:
-  - Other characters' current positions (if they haven't moved yet)
-  - Other characters' planned positions at step N (if their path includes step N)
-  - Characters who completed their paths (they stay at destination for all subsequent steps)
+- Steps can always be added to paths during planning (no blocking)
+- Validation happens at execution time, not planning time
+- Only the next step (the one about to be executed) is validated
+- When first step is added for a character, validate that step and enable/disable "Execute Free Moves" button
+- After each execution, validate the next step for all characters and update button state
+- Future steps cannot be validated because the environment can change (doors, obstacles, other characters)
 
 **Visual Feedback:**
 - **Selected character:** Full path line with step numbers
 - **All characters:** Show start positions (grayed), end positions (full color), current step position (highlighted)
-- **Occupied squares:** Grayed out (cannot select)
 - **Path preview:** Line connecting tiles, step numbers visible
+- **Invalid next steps:** Highlighted in red (steps that cannot be executed due to conflicts or invalid moves)
+- **Error messages:** Show why "Execute Free Moves" is disabled (conflicts, invalid moves, etc.)
 
 ### Execution Phase
 
@@ -68,13 +71,16 @@ For each character:
   - Mark as Complete (already at destination)
 ```
 
-**Step Validation:**
+**Step Validation (Execution Time Only):**
+- Only validate the next step (the one about to be executed)
 - Check if target square is valid:
   - Not a wall
   - Not occupied by another character (at current step)
   - Not blocked by state change
   - Within bounds
   - Respects DEX movement patterns
+- Future steps are not validated because environment can change
+- After each step execution, re-validate the next step for all characters
 
 **Failure Handling:**
 - If step becomes invalid (state change, obstacle, etc.):

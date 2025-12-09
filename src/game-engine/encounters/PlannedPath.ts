@@ -3,7 +3,7 @@ import { GridPosition } from '../grid/Grid';
 /**
  * Status of a planned path
  */
-export type PathStatus = 'planning' | 'ready' | 'executing' | 'complete' | 'blocked';
+export type PathStatus = 'planning' | 'ready' | 'executing' | 'complete' | 'blocked' | 'conflicting';
 
 /**
  * Represents a planned movement path for a character
