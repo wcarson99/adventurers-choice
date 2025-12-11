@@ -659,13 +659,14 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           return pos.x === objPos.x + push.dx && pos.y === objPos.y + push.dy;
         });
         
-        // Check if this tile is part of a planned path
+        // Check if this tile is part of a planned path (only unexecuted steps)
         const isPathStep = phase === 'movement' && (() => {
           // Check all characters' paths
           const allPaths = movementPlan.getAllPaths();
           for (const path of allPaths) {
             const stepIndex = path.steps.findIndex(step => step.x === pos.x && step.y === pos.y);
-            if (stepIndex >= 0) {
+            // Only highlight steps that haven't been executed yet
+            if (stepIndex >= 0 && stepIndex >= path.currentStepIndex) {
               return { path, stepIndex: stepIndex + 1 }; // Step numbers start at 1
             }
           }
