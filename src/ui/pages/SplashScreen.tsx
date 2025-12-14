@@ -20,23 +20,6 @@ const SplashScreen: React.FC = () => {
       });
   }, []);
 
-  // Verify button positioning
-  useEffect(() => {
-    const button = document.querySelector('button[onclick]') as HTMLElement;
-    if (button) {
-      const rect = button.getBoundingClientRect();
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SplashScreen.tsx:25',message:'Button position verification',data:{computedTop:rect.top,computedLeft:rect.left,styleTop:button.style.top,styleLeft:button.style.left,width:rect.width,height:rect.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'positioning'})}).catch(()=>{});
-      // #endregion
-      console.log('Start Adventure button position:', {
-        top: rect.top,
-        left: rect.left,
-        styleTop: button.style.top,
-        styleLeft: button.style.left
-      });
-    }
-  }, []);
-
   const handleNewGame = async () => {
     if (selectedOption === 'random') {
       // Random mode - go to character creation with default characters
@@ -78,7 +61,7 @@ const SplashScreen: React.FC = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(26, 22, 37, 0.6)', // theme.colors.background with 60% opacity
+        backgroundColor: 'rgba(26, 22, 37, 0.6)',
         zIndex: 0
       }} />
       
@@ -97,22 +80,22 @@ const SplashScreen: React.FC = () => {
         {/* Game Selection - positioned above Start Adventure button */}
         <div style={{
           position: 'absolute',
-          top: '18%', // Positioned above the Start Adventure button
+          top: 'calc(18% + 150px)',
           left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex',
           flexDirection: 'column',
           gap: '1rem',
           alignItems: 'center',
-          minWidth: '240px' // Reduced by 20% (from 300px)
+          minWidth: '240px'
         }}>
           <select
             value={selectedOption}
             onChange={(e) => setSelectedOption(e.target.value)}
             style={{
               padding: '0.5rem',
-              fontSize: '2rem', // 2x taller (from 1rem)
-              width: '264px', // Increased by 10% (from 240px)
+              fontSize: '2rem',
+              width: '264px',
               backgroundColor: theme.colors.cardBackground,
               color: theme.colors.text,
               border: `1px solid ${theme.colors.imageBorder}`,
@@ -129,43 +112,32 @@ const SplashScreen: React.FC = () => {
           </select>
         </div>
 
-        {/* New Game Button - positioned to fully cover brown Start Adventure circle at top */}
+        {/* Start Adventure Button */}
         <button 
           onClick={handleNewGame}
           disabled={loading}
           style={{
             position: 'absolute',
-            top: '222px', // Fixed pixel position
-            left: '633px', // Fixed pixel position
-            padding: '1.6rem 4rem',
-            fontSize: '2.88rem', // Increased by 20% (from 2.4rem)
+            top: '402px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '0.5rem',
+            fontSize: '2rem',
             fontWeight: 'bold',
             backgroundColor: loading
               ? theme.colors.imageBackground
               : theme.colors.success,
             color: theme.colors.text,
-            border: 'none',
-            borderRadius: '50px', // More circular to fully cover the circle
+            border: '1px solid #8B4513',
+            borderRadius: '4px',
             cursor: loading ? 'not-allowed' : 'pointer',
             boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
             opacity: loading ? 0.6 : 1,
-            minWidth: '280px',
-            minHeight: '145px', // Increased by 15% (from 126px)
-            lineHeight: '1.2',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center'
+            minWidth: '220px',
+            lineHeight: '1.2'
           }}
         >
-          {loading ? (
-            'Loading...'
-          ) : (
-            <>
-              <span>Start</span>
-              <span>Adventure</span>
-            </>
-          )}
+          {loading ? 'Loading...' : 'Start Adventure'}
         </button>
       </div>
     </div>

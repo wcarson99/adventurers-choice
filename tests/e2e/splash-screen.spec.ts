@@ -13,19 +13,15 @@ test.describe('Splash Screen', () => {
     expect(boundingBox).not.toBeNull();
     
     if (boundingBox) {
-      // Verify the button's position matches expected values
-      // Expected: left: 633px, top: 222px
-      // Allow some tolerance for browser rendering differences (±5px)
-      expect(boundingBox.x).toBeCloseTo(633, 0);
-      expect(boundingBox.y).toBeCloseTo(222, 0);
+      // Verify the button is centered horizontally
+      // Button should be centered in the 1280px wide container
+      const containerWidth = 1280;
+      const buttonCenterX = boundingBox.x + boundingBox.width / 2;
+      const expectedCenterX = containerWidth / 2;
+      expect(buttonCenterX).toBeCloseTo(expectedCenterX, 0);
       
-      // Log the actual position for debugging
-      console.log('Button position:', {
-        left: boundingBox.x,
-        top: boundingBox.y,
-        width: boundingBox.width,
-        height: boundingBox.height
-      });
+      // Verify the button's vertical position
+      expect(boundingBox.y).toBeCloseTo(402, 0);
     }
     
     // Verify the button's inline styles
@@ -35,35 +31,14 @@ test.describe('Splash Screen', () => {
     const styleLeft = await button.evaluate((el) => {
       return window.getComputedStyle(el).left;
     });
-    
-    // Verify styles are set to pixel values
-    expect(styleTop).toBe('222px');
-    expect(styleLeft).toBe('633px');
-    
-    // #region agent log
-    await page.evaluate((data) => {
-      fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'splash-screen.spec.ts:40',
-          message: 'Button position test results',
-          data: data,
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId: 'positioning'
-        })
-      }).catch(() => {});
-    }, {
-      boundingBoxX: boundingBox?.x,
-      boundingBoxY: boundingBox?.y,
-      styleTop,
-      styleLeft,
-      expectedLeft: 633,
-      expectedTop: 222
+    const styleTransform = await button.evaluate((el) => {
+      return window.getComputedStyle(el).transform;
     });
-    // #endregion
+    
+    // Verify styles are set correctly
+    expect(styleTop).toBe('402px');
+    expect(styleLeft).toBe('640px'); // 50% of 1280px
+    expect(styleTransform).toContain('translateX');
   });
   
   test('Start Adventure button is clickable', async ({ page }) => {
