@@ -186,7 +186,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const completeMission = () => {
     setState(prev => {
       // Handle campaign encounter completion
-      if (prev.gameMode === 'campaign' && prev.activeCampaign && prev.currentEncounterIndex !== undefined) {
+      // Check for campaign mode OR if we have an activeCampaign (fallback for state issues)
+      if ((prev.gameMode === 'campaign' || prev.activeCampaign) && prev.activeCampaign && prev.currentEncounterIndex !== undefined) {
+        console.log('🟡 Handling campaign completion', {
+          encounterIndex: prev.currentEncounterIndex,
+          totalEncounters: prev.activeCampaign.encounters.length
+        });
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GameState.tsx:192',message:'Handling campaign completion',data:{encounterIndex:prev.currentEncounterIndex,totalEncounters:prev.activeCampaign.encounters.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
         const encounterIndex = prev.currentEncounterIndex;
         const totalEncounters = prev.activeCampaign.encounters.length;
         
@@ -221,7 +229,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       
       // Handle roguelike mission completion
-      if (!prev.activeMission) return prev;
+      if (!prev.activeMission) {
+        return prev;
+      }
       
       // Add mission to completed list (but don't give reward yet)
       return {

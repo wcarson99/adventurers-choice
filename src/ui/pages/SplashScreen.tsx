@@ -20,6 +20,23 @@ const SplashScreen: React.FC = () => {
       });
   }, []);
 
+  // Verify button positioning
+  useEffect(() => {
+    const button = document.querySelector('button[onclick]') as HTMLElement;
+    if (button) {
+      const rect = button.getBoundingClientRect();
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SplashScreen.tsx:25',message:'Button position verification',data:{computedTop:rect.top,computedLeft:rect.left,styleTop:button.style.top,styleLeft:button.style.left,width:rect.width,height:rect.height},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'positioning'})}).catch(()=>{});
+      // #endregion
+      console.log('Start Adventure button position:', {
+        top: rect.top,
+        left: rect.left,
+        styleTop: button.style.top,
+        styleLeft: button.style.left
+      });
+    }
+  }, []);
+
   const handleNewGame = async () => {
     if (selectedOption === 'random') {
       // Random mode - go to character creation with default characters
@@ -118,9 +135,8 @@ const SplashScreen: React.FC = () => {
           disabled={loading}
           style={{
             position: 'absolute',
-            top: '28%', // Moved up approximately 30px (from 32%)
-            left: '50%',
-            transform: 'translateX(-50%)',
+            top: '222px', // Fixed pixel position
+            left: '633px', // Fixed pixel position
             padding: '1.6rem 4rem',
             fontSize: '2.88rem', // Increased by 20% (from 2.4rem)
             fontWeight: 'bold',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useGame } from '../../game-engine/GameState';
 import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from '../../game-engine/ecs/Component';
 import { theme } from '../styles/theme';
@@ -37,6 +37,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const [validPushDirections, setValidPushDirections] = useState<Array<{ dx: number; dy: number; staminaCost: number }>>([]);
   const [movementPlan] = useState<MovementPlan>(() => new MovementPlan());
   const [pathUpdateTrigger, setPathUpdateTrigger] = useState(0); // Force re-render when paths change
+  const isCompletingRef = useRef(false); // Prevent multiple completion calls (use ref to avoid dependency issues)
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
 
@@ -507,11 +508,17 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         setTick(t => t + 1); // Trigger re-render
 
         // Check for win condition (all characters in exit zone)
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:509',message:'Win condition check - legacy execution path',data:{phase:'legacy_execution'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         const allCharacters = getPlayerCharacters();
         const allInExit = allCharacters.every(charId => {
           const pos = world.getComponent<PositionComponent>(charId, 'Position');
           return pos && grid.isExitZone(pos.x, pos.y);
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:515',message:'Win condition result',data:{allInExit,characterCount:allCharacters.length,characterPositions:allCharacters.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
 
         if (allInExit) {
           setTimeout(() => {
@@ -528,6 +535,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
               if (activeMission) consumeFood(activeMission.days * 4);
             }
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:531',message:'Calling completeMission - legacy path',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
             completeMission();
           }, 100);
         }
@@ -1033,7 +1043,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               return (
                 <button
                   onClick={() => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1045',message:'Execute Free Moves button clicked',data:{executablePathsCount:executablePaths.length,paths:executablePaths.map(p=>({charId:p.characterId,currentStep:p.currentStepIndex,totalSteps:p.steps.length,nextStep:p.steps[p.currentStepIndex]}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                    // #endregion
                     // Execute next step for all characters with executable paths
+                    let allInExitDuringMovement = false;
                     executablePaths.forEach(path => {
                       const nextStep = path.steps[path.currentStepIndex];
                       if (nextStep) {
@@ -1050,8 +1064,36 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         } else {
                           path.status = 'executing';
                         }
+                        
+                        // Check win condition after each character moves
+                        const allChars = getPlayerCharacters();
+                        const allInExitNow = allChars.every(charId => {
+                          const pos = world.getComponent<PositionComponent>(charId, 'Position');
+                          return pos ? grid.isExitZone(pos.x, pos.y) : false;
+                        });
+                        if (allInExitNow) {
+                          allInExitDuringMovement = true;
+                        }
                       }
                     });
+                    
+                    // If win condition met during movement, handle it immediately
+                    if (allInExitDuringMovement) {
+                      // Show status message
+                      if (activeCampaign && currentEncounterIndex !== undefined) {
+                        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
+                        if (isLastEncounter) {
+                          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
+                        } else {
+                          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
+                        }
+                      } else {
+                        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
+                        if (activeMission) consumeFood(activeMission.days * 4);
+                      }
+                      completeMission();
+                      return; // Don't continue with normal flow
+                    }
                     
                     // After execution, re-validate next steps for all characters
                     const remainingPaths = movementPlan.getAllPaths().filter(p => 
@@ -1102,6 +1144,30 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         movementPlan.setPathStatus(path.characterId, 'ready');
                       }
                     });
+                    
+                    // Check for win condition after executing movement
+                    const allCharactersAfterMovement = getPlayerCharacters();
+                    const allInExitAfterMovement = allCharactersAfterMovement.every(charId => {
+                      const pos = world.getComponent<PositionComponent>(charId, 'Position');
+                      return pos ? grid.isExitZone(pos.x, pos.y) : false;
+                    });
+                    
+                    if (allInExitAfterMovement) {
+                      // Show status message
+                      if (activeCampaign && currentEncounterIndex !== undefined) {
+                        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
+                        if (isLastEncounter) {
+                          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
+                        } else {
+                          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
+                        }
+                      } else {
+                        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
+                        if (activeMission) consumeFood(activeMission.days * 4);
+                      }
+                      completeMission();
+                      return; // Don't continue with normal flow
+                    }
                     
                     setTick(t => t + 1); // Trigger re-render
                     setPathUpdateTrigger(t => t + 1); // Update button state
@@ -1551,7 +1617,44 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                       }
                     });
                     
-                    // Reset after execution
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1553',message:'After skill phase execution - checking win condition',data:{phase:'skill_execution'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                    // #endregion
+                    
+                    // Check for win condition after executing actions
+                    const allCharactersAfterActions = getPlayerCharacters();
+                    const allInExitAfterActions = allCharactersAfterActions.every(charId => {
+                      const pos = world.getComponent<PositionComponent>(charId, 'Position');
+                      return pos && grid.isExitZone(pos.x, pos.y);
+                    });
+                    // #region agent log
+                    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1560',message:'Win condition result after skill phase',data:{allInExit:allInExitAfterActions,characterCount:allCharactersAfterActions.length,characterPositions:allCharactersAfterActions.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                    // #endregion
+                    
+                    // Check win condition immediately after executing actions
+                    if (allInExitAfterActions) {
+                      console.log('✅ Win condition met after skill execution - calling completeMission()');
+                      // #region agent log
+                      fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1700',message:'Win condition met - calling completeMission from skill phase',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                      // #endregion
+                      // Show status message
+                      if (activeCampaign && currentEncounterIndex !== undefined) {
+                        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
+                        if (isLastEncounter) {
+                          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
+                        } else {
+                          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
+                        }
+                      } else {
+                        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
+                        if (activeMission) consumeFood(activeMission.days * 4);
+                      }
+                      // Call completeMission directly - no setTimeout delay needed
+                      completeMission();
+                      return; // Don't reset to movement phase
+                    }
+                    
+                    // Reset after execution (only if win condition not met)
                     setTimeout(() => {
                       setPlannedActions([]);
                       setPhase('movement');
