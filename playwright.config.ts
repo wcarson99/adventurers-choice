@@ -21,6 +21,10 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    /* Screenshot on failure for debugging */
+    screenshot: 'only-on-failure',
+    /* Video on failure for debugging */
+    video: 'retain-on-failure',
   },
 
   /* Configure projects for major browsers */
@@ -45,7 +49,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
 });
 

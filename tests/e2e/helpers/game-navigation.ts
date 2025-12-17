@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 
 /**
  * Helper functions for navigating through the game flow
@@ -11,9 +11,12 @@ export class GameNavigation {
    */
   async startNewGame(): Promise<void> {
     await this.page.goto('/');
-    await this.page.getByRole('button', { name: 'New Game' }).click();
+    // Wait for the button to be visible (it might take a moment to load)
+    const button = this.page.getByRole('button', { name: /Start.*Adventure/i });
+    await expect(button).toBeVisible({ timeout: 5000 });
+    await button.click();
     // Wait for character creation screen
-    await this.page.waitForSelector('text=Assemble Your Party');
+    await this.page.waitForSelector('text=Assemble Your Party', { timeout: 10000 });
   }
 
   /**

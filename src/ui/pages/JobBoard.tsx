@@ -1,6 +1,8 @@
 import React from 'react';
 import { useGame, Mission } from '../../game-engine/GameState';
 import { theme } from '../styles/theme';
+import { getEncounterTypeDisplayName } from '../../types/Encounter';
+import { StatRequirements } from '../components/StatRequirements';
 
 const MOCK_MISSIONS: Mission[] = [
   {
@@ -9,7 +11,15 @@ const MOCK_MISSIONS: Mission[] = [
     description: 'A local cave is infested with goblins. Clear them out.',
     days: 3,
     rewardGold: 15,
-    rewardAp: 3
+    rewardAp: 3,
+    encounterType: {
+      type: 'combat',
+      requiredStats: [
+        { attribute: 'str', minimum: 3 },
+        { attribute: 'dex', minimum: 2 },
+        { attribute: 'con', minimum: 2 }
+      ]
+    }
   },
   {
     id: 'm2',
@@ -17,7 +27,15 @@ const MOCK_MISSIONS: Mission[] = [
     description: 'Merchants are stuck on the road. Help them.',
     days: 4,
     rewardGold: 20,
-    rewardAp: 4
+    rewardAp: 4,
+    encounterType: {
+      type: 'trading',
+      requiredStats: [
+        { attribute: 'cha', minimum: 3 },
+        { attribute: 'int', minimum: 2 },
+        { attribute: 'wis', minimum: 2 }
+      ]
+    }
   },
   {
     id: 'm3',
@@ -25,12 +43,58 @@ const MOCK_MISSIONS: Mission[] = [
     description: 'Rumors of treasure in the old ruins.',
     days: 5,
     rewardGold: 25,
-    rewardAp: 5
+    rewardAp: 5,
+    encounterType: {
+      type: 'obstacle',
+      requiredStats: [
+        { attribute: 'int', minimum: 3 },
+        { attribute: 'wis', minimum: 2 },
+        { attribute: 'dex', minimum: 2 }
+      ]
+    }
   }
 ];
 
 const JobBoard: React.FC = () => {
   const { setView, startMission, getTotalFood, completedMissions, turnInMission, showStatus } = useGame();
+  const missionsListRef = React.useRef<HTMLDivElement>(null);
+  
+  // Verify scrollbar visibility
+  React.useEffect(() => {
+    if (missionsListRef.current) {
+      const el = missionsListRef.current;
+      const styles = window.getComputedStyle(el);
+      const hasScrollbar = el.offsetWidth > el.clientWidth || el.scrollHeight > el.clientHeight;
+      
+      console.log('=== Scrollbar Verification ===');
+      console.log('overflowY:', styles.overflowY);
+      console.log('maxHeight:', styles.maxHeight);
+      console.log('scrollHeight:', el.scrollHeight);
+      console.log('clientHeight:', el.clientHeight);
+      console.log('offsetWidth:', el.offsetWidth);
+      console.log('clientWidth:', el.clientWidth);
+      const scrollbarWidth = el.offsetWidth - el.clientWidth;
+      console.log('Scrollbar visible (width diff):', scrollbarWidth);
+      console.log('Has overflow:', el.scrollHeight > el.clientHeight);
+      
+      // Check if scrollbar is actually rendered (webkit)
+      const scrollbar = window.getComputedStyle(el, '::-webkit-scrollbar');
+      console.log('Webkit scrollbar width:', scrollbar.width);
+      
+      // Try to detect scrollbar visibility
+      const testScroll = el.scrollTop;
+      el.scrollTop = 1;
+      const canScroll = el.scrollTop > 0;
+      el.scrollTop = testScroll;
+      console.log('Can scroll:', canScroll);
+      console.log('============================');
+      
+      if (scrollbarWidth === 0 && styles.overflowY === 'scroll' && el.scrollHeight > el.clientHeight) {
+        console.warn('⚠️ Scrollbar exists but is overlaying (not reserving space). This is normal for overlay scrollbars.');
+        console.warn('⚠️ The scrollbar should still be visible on the right edge when hovering or scrolling.');
+      }
+    }
+  }, []);
 
   const handleAccept = (mission: Mission) => {
     const foodCost = mission.days * 4; // 4 characters
@@ -53,27 +117,74 @@ const JobBoard: React.FC = () => {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      height: '100%',
-      backgroundColor: theme.colors.background,
-      color: theme.colors.text,
-      fontFamily: 'sans-serif',
-      padding: '2rem',
-      overflowY: 'auto'
-    }}>
-      <h2 style={{ fontSize: '2.5rem', marginBottom: '2rem', color: theme.colors.accentLight }}>Job Board</h2>
+    <>
+      <style>{`
+        .missions-scroll-container {
+          overflow-y: scroll !important;
+          overflow-x: hidden !important;
+          /* Reserve space for scrollbar (works with classic scrollbars) */
+          scrollbar-gutter: stable;
+        }
+        /* Webkit browsers (Chrome, Safari, Edge) - Custom scrollbar styling */
+        .missions-scroll-container::-webkit-scrollbar {
+          width: 14px !important;
+          -webkit-appearance: none !important;
+        }
+        .missions-scroll-container::-webkit-scrollbar-track {
+          background: ${theme.colors.background} !important;
+          border-left: 2px solid ${theme.colors.accent} !important;
+        }
+        .missions-scroll-container::-webkit-scrollbar-thumb {
+          background: ${theme.colors.accent} !important;
+          border-radius: 7px !important;
+          border: 2px solid ${theme.colors.background} !important;
+          min-height: 30px !important;
+        }
+        .missions-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: ${theme.colors.accentLight} !important;
+        }
+        .missions-scroll-container::-webkit-scrollbar-thumb:active {
+          background: ${theme.colors.accentLight} !important;
+        }
+        /* Note: On macOS, overlay scrollbars may only appear on hover/scrolling */
+        /* To always see scrollbars, user can change System Preferences > General > Show scroll bars: Always */
+        /* Firefox */
+        .missions-scroll-container {
+          scrollbar-width: thin !important;
+          scrollbar-color: ${theme.colors.accent} ${theme.colors.background} !important;
+        }
+      `}</style>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        height: '100vh',
+        maxHeight: '100vh',
+        overflow: 'hidden',
+        backgroundColor: theme.colors.background,
+        color: theme.colors.text,
+        fontFamily: 'sans-serif',
+        padding: '2rem',
+        boxSizing: 'border-box',
+        position: 'relative'
+      }}>
+      <h2 style={{ fontSize: '2.5rem', marginBottom: '2rem', color: theme.colors.accentLight, flexShrink: 0, height: 'auto' }}>Job Board</h2>
       
       {/* Completed Missions Section */}
       {completedMissions.length > 0 && (
-        <div style={{ width: '100%', maxWidth: '1200px', marginBottom: '3rem' }}>
+        <div style={{ 
+          width: '100%', 
+          maxWidth: '1200px', 
+          marginBottom: '2rem',
+          maxHeight: '40vh',
+          overflowY: 'auto',
+          paddingRight: '0.5rem'
+        }}>
           <h3 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: theme.colors.accent }}>✅ Completed Missions - Turn In For Reward!</h3>
           <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr 1fr', 
-            gap: '2rem'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem'
           }}>
             {completedMissions.map(mission => (
               <div key={mission.id} style={{
@@ -82,19 +193,20 @@ const JobBoard: React.FC = () => {
                 borderRadius: '8px',
                 boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 border: `2px solid ${theme.colors.accent}`
               }}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <h3 style={{ color: '#fff', marginBottom: '0.5rem' }}>{mission.title}</h3>
-                  <div style={{ marginBottom: '1rem' }}>💰 Reward: {mission.rewardGold} Gold</div>
+                  <div style={{ color: '#fff' }}>💰 Reward: {mission.rewardGold} Gold</div>
                 </div>
                 
                 <button 
                   onClick={() => handleTurnIn(mission.id)}
                   style={{
-                    padding: '1rem',
+                    padding: '1rem 2rem',
                     fontSize: '1.1rem',
                     backgroundColor: theme.colors.accent,
                     color: theme.colors.background,
@@ -102,7 +214,7 @@ const JobBoard: React.FC = () => {
                     borderRadius: '4px',
                     cursor: 'pointer',
                     fontWeight: 'bold',
-                    marginTop: '1rem'
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   Turn In Mission
@@ -113,47 +225,132 @@ const JobBoard: React.FC = () => {
         </div>
       )}
       
-      {/* Available Missions Section */}
-      <div style={{ width: '100%', maxWidth: '1200px' }}>
-        <h3 style={{ fontSize: '1.8rem', marginBottom: '1rem' }}>Available Missions</h3>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: '1fr 1fr 1fr', 
-          gap: '2rem'
-        }}>
+      {/* Available Missions Section - Scrollable List */}
+      <div 
+        style={{ 
+          width: '100%', 
+          maxWidth: '1200px',
+          flex: '1 1 0',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <div 
+          ref={missionsListRef}
+          data-testid="missions-list"
+          style={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            overflowY: 'scroll',
+            overflowX: 'hidden',
+            flex: '1 1 0',
+            minHeight: 0,
+            width: '100%',
+            maxHeight: 'calc(100vh - 350px)', // Constrain height more to ensure scrollbar appears with more overflow
+            scrollbarGutter: 'stable',
+            // Force scrollbar to always be visible
+            scrollbarWidth: 'thin', // Firefox
+            scrollbarColor: `${theme.colors.accent} ${theme.colors.background}`, // Firefox
+          }}
+          className="missions-scroll-container"
+        >
           {MOCK_MISSIONS.map(mission => (
-            <div key={mission.id} style={{
+            <div 
+              key={mission.id} 
+              data-testid={`mission-${mission.id}`}
+              style={{
               backgroundColor: theme.colors.cardBackground,
-              padding: '1.5rem',
+              padding: '1rem 1.5rem',
               borderRadius: '8px',
               boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between'
+              gap: '0.75rem'
             }}>
-              <div>
-                <h3 style={{ color: theme.colors.accentLight, marginBottom: '0.5rem' }}>{mission.title}</h3>
-                <p style={{ marginBottom: '1rem', fontStyle: 'italic' }}>{mission.description}</p>
-                <div style={{ marginBottom: '0.5rem' }}>⏳ Duration: {mission.days} Days</div>
-                <div style={{ marginBottom: '0.5rem' }}>🍖 Food Cost: {mission.days * 4}</div>
-                <div style={{ marginBottom: '1rem' }}>💰 Reward: {mission.rewardGold} Gold</div>
+              {/* First line: name, type, time, cost with accept button on right */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                gap: '1rem',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '1rem',
+                  flex: 1,
+                  flexWrap: 'wrap'
+                }}>
+                  <h3 
+                    data-testid={`mission-title-${mission.id}`}
+                    style={{ 
+                      color: theme.colors.accentLight, 
+                      fontSize: '1.1rem',
+                      fontWeight: 'bold',
+                      margin: 0
+                    }}
+                  >
+                    {mission.title}
+                  </h3>
+                  <span 
+                    data-testid={`mission-type-${mission.id}`}
+                    style={{ 
+                      fontSize: '0.9rem', 
+                      color: theme.colors.accent,
+                      fontWeight: 'bold',
+                      padding: '0.25rem 0.75rem',
+                      backgroundColor: theme.colors.background,
+                      borderRadius: '4px'
+                    }}
+                  >
+                    {getEncounterTypeDisplayName(mission.encounterType)}
+                  </span>
+                  <span style={{ fontSize: '0.9rem', color: theme.colors.textSecondary }}>
+                    ⏳ {mission.days} Days
+                  </span>
+                  <span style={{ fontSize: '0.9rem', color: theme.colors.textSecondary }}>
+                    🍖 {mission.days * 4} Food
+                  </span>
+                  <span style={{ fontSize: '0.9rem', color: theme.colors.accent, fontWeight: 'bold' }}>
+                    💰 {mission.rewardGold} Gold
+                  </span>
+                </div>
+                <button 
+                  onClick={() => handleAccept(mission)}
+                  style={{
+                    padding: '0.5rem 1.25rem',
+                    fontSize: '0.9rem',
+                    backgroundColor: theme.colors.success,
+                    color: theme.colors.text,
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Accept Mission
+                </button>
               </div>
               
-              <button 
-                onClick={() => handleAccept(mission)}
-                style={{
-                  padding: '1rem',
-                  fontSize: '1.1rem',
-                  backgroundColor: theme.colors.success,
-                  color: theme.colors.text,
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  marginTop: '1rem'
-                }}
-              >
-                Accept Mission
-              </button>
+              {/* Second line: required stats */}
+              <div data-testid={`mission-stats-${mission.id}`}>
+                <StatRequirements requiredStats={mission.encounterType.requiredStats} />
+              </div>
+              
+              {/* Third line: description */}
+              <p style={{ 
+                margin: 0, 
+                fontStyle: 'italic', 
+                color: theme.colors.textSecondary,
+                fontSize: '0.9rem'
+              }}>
+                {mission.description}
+              </p>
             </div>
           ))}
         </div>
@@ -162,19 +359,21 @@ const JobBoard: React.FC = () => {
       <button 
         onClick={() => setView('TOWN')}
         style={{
-          marginTop: '3rem',
+          marginTop: '2rem',
           padding: '1rem 2rem',
           fontSize: '1.2rem',
           backgroundColor: theme.colors.cardBackground,
           color: theme.colors.text,
           border: 'none',
           borderRadius: '4px',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          flexShrink: 0
         }}
       >
         Back to Town
       </button>
     </div>
+    </>
   );
 };
 

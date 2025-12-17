@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { theme } from '../ui/styles/theme';
+import type { EncounterType } from '../types/Encounter';
 
 // Define the possible views in the game loop
 export type GameView =
@@ -18,6 +19,7 @@ export interface Mission {
   days: number;
   rewardGold: number;
   rewardAp: number;
+  encounterType: EncounterType;
 }
 
 export interface Attributes {

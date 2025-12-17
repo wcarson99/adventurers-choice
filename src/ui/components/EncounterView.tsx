@@ -9,7 +9,7 @@ import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
 import { ConflictDetector } from '../../game-engine/encounters/ConflictDetector';
 
 interface EncounterViewProps {
-  activeMission?: { title: string; description: string };
+  activeMission?: { title: string; description: string; days?: number };
   onCompleteMission?: () => void;
 }
 
@@ -533,7 +533,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               }
             } else {
               showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-              if (activeMission) consumeFood(activeMission.days * 4);
+              if (activeMission?.days) consumeFood(activeMission.days * 4);
             }
             // #region agent log
             fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:531',message:'Calling completeMission - legacy path',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
@@ -1089,7 +1089,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         }
                       } else {
                         showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-                        if (activeMission) consumeFood(activeMission.days * 4);
+                        if (activeMission?.days) consumeFood(activeMission.days * 4);
                       }
                       completeMission();
                       return; // Don't continue with normal flow
@@ -1163,7 +1163,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         }
                       } else {
                         showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-                        if (activeMission) consumeFood(activeMission.days * 4);
+                        if (activeMission?.days) consumeFood(activeMission.days * 4);
                       }
                       completeMission();
                       return; // Don't continue with normal flow
@@ -1647,7 +1647,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         }
                       } else {
                         showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-                        if (activeMission) consumeFood(activeMission.days * 4);
+                        if (activeMission?.days) consumeFood(activeMission.days * 4);
                       }
                       // Call completeMission directly - no setTimeout delay needed
                       completeMission();
