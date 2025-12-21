@@ -107,15 +107,15 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     }
     
     console.log('Character Attributes:', attrs);
-    console.log('Character STR:', attrs.str);
+    console.log('Character PWR:', attrs.pwr);
 
     const actions: Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> = [
       { name: 'Wait', cost: 0 }
     ];
 
-    // Check if character can push (STR 3+)
-    if (attrs.str >= 3) {
-      console.log('✅ Character has STR >= 3, checking for pushable objects...');
+    // Check if character can push (PWR 3+)
+    if (attrs.pwr >= 3) {
+      console.log('✅ Character has PWR >= 3, checking for pushable objects...');
       
       // Use current position (after movements in skill phase, or original in movement phase)
       const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
@@ -202,7 +202,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         console.log('❌ Character has no position');
       }
     } else {
-      console.log('❌ Character STR < 3, cannot push');
+      console.log('❌ Character PWR < 3, cannot push');
     }
 
     console.log('Final actions:', actions);
@@ -243,7 +243,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         fromPos = { x: currentPos.x, y: currentPos.y };
       }
       
-      const moves = movementSystem.getValidMoves(world, grid, characterId, fromPos, attrs.dex);
+      const moves = movementSystem.getValidMoves(world, grid, characterId, fromPos, attrs.mov);
       setValidMoves(moves);
     } else if (phase === 'skill') {
       // In skill phase, select character for action planning
@@ -352,7 +352,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           selectedCharacter,
           fromPos,
           { x, y },
-          attrs.dex
+          attrs.mov
         );
         
         if (isValidStep) {
@@ -363,7 +363,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           setPathUpdateTrigger(t => t + 1);
           
           // Update valid moves for next step (from the newly added position)
-          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, { x, y }, attrs.dex);
+          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, { x, y }, attrs.mov);
           setValidMoves(moves);
           
           setTick(t => t + 1); // Trigger re-render to show path preview
@@ -428,9 +428,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
     // Legacy code for executing phase (should not run in movement or skill phase)
     // This code is for backward compatibility with old execution model
-    if (phase === 'movement' || phase === 'skill') {
-      return; // Should have been handled above, but guard against fall-through
-    }
+    // Note: movement and skill phases have already returned above, so phase is 'executing' here
     
     const entities = world.getAllEntities();
     const clickedEntity = entities.find(id => {
@@ -582,7 +580,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         const r = world.getComponent<RenderableComponent>(clickedEntity, 'Renderable');
         if (r && r.color === theme.colors.accent) {
           handleCharacterClick(clickedEntity);
-        } else if (clickedPushable && phase === 'skill') {
+        } else if (clickedPushable) {
           // In skill phase, selecting an item for push action
           setSelectedObject(clickedEntity);
         } else if (clickedPushable) {
@@ -1010,7 +1008,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                   path.characterId,
                   { x: currentPos.x, y: currentPos.y },
                   nextStep,
-                  attrs.dex
+                  attrs.mov
                 );
                 
                 if (!isValidMove) {
@@ -1117,7 +1115,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         path.characterId,
                         { x: currentPos.x, y: currentPos.y },
                         nextStep,
-                        attrs.dex
+                        attrs.mov
                       );
                       
                       if (!isValidMove) {
@@ -1218,7 +1216,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                               return;
                             }
                           }
-                          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, fromPos, attrs.dex);
+                          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, fromPos, attrs.mov);
                           setValidMoves(moves);
                         }
                         setPathUpdateTrigger(t => t + 1);
@@ -1720,12 +1718,10 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-                <div>STR: {attrs.str}</div>
-                <div>DEX: {attrs.dex}</div>
-                <div>CON: {attrs.con}</div>
-                <div>INT: {attrs.int}</div>
-                <div>WIS: {attrs.wis}</div>
-                <div>CHA: {attrs.cha}</div>
+                <div>PWR: {attrs.pwr}</div>
+                <div>MOV: {attrs.mov}</div>
+                <div>INF: {attrs.inf}</div>
+                <div>CRE: {attrs.cre}</div>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.8rem' }}>

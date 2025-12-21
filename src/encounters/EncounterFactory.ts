@@ -30,11 +30,11 @@ export class EncounterFactory {
       const entityId = world.createEntity();
 
       // Add position component
-      world.addComponent<PositionComponent>(entityId, {
+      world.addComponent(entityId, {
         type: 'Position',
         x: entity.position.x,
         y: entity.position.y,
-      });
+      } as PositionComponent);
 
       // Handle different entity types
       switch (entity.type) {
@@ -89,23 +89,21 @@ export class EncounterFactory {
     party.push(character);
 
     // Add renderable component
-    world.addComponent<RenderableComponent>(entityId, {
+    world.addComponent(entityId, {
       type: 'Renderable',
       char: character.name[0].toUpperCase(),
       color: theme.colors.accent,
       sprite: character.sprite,
-    });
+    } as RenderableComponent);
 
     // Add attributes component
-    world.addComponent<AttributesComponent>(entityId, {
+    world.addComponent(entityId, {
       type: 'Attributes',
-      str: props.attributes.str,
-      dex: props.attributes.dex,
-      con: props.attributes.con,
-      int: props.attributes.int,
-      wis: props.attributes.wis,
-      cha: props.attributes.cha,
-    });
+      pwr: props.attributes.pwr,
+      mov: props.attributes.mov,
+      inf: props.attributes.inf,
+      cre: props.attributes.cre,
+    } as AttributesComponent);
   }
 
   /**
@@ -124,19 +122,19 @@ export class EncounterFactory {
     }
 
     // Add renderable component
-    world.addComponent<RenderableComponent>(entityId, {
+    world.addComponent(entityId, {
       type: 'Renderable',
       char: 'C',
       color: '#8B4513', // Brown for crate
       sprite: props.sprite || '/assets/items/crate.png',
-    });
+    } as RenderableComponent);
 
     // Add pushable component
-    world.addComponent<PushableComponent>(entityId, {
+    world.addComponent(entityId, {
       type: 'Pushable',
       weight: props.weight,
       sprite: props.sprite || '/assets/items/crate.png',
-    });
+    } as PushableComponent);
   }
 }
 

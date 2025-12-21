@@ -15,9 +15,8 @@ const MOCK_MISSIONS: Mission[] = [
     encounterType: {
       type: 'combat',
       requiredStats: [
-        { attribute: 'str', minimum: 3 },
-        { attribute: 'dex', minimum: 2 },
-        { attribute: 'con', minimum: 2 }
+        { attribute: 'pwr', minimum: 3 },
+        { attribute: 'mov', minimum: 2 }
       ]
     }
   },
@@ -31,9 +30,8 @@ const MOCK_MISSIONS: Mission[] = [
     encounterType: {
       type: 'trading',
       requiredStats: [
-        { attribute: 'cha', minimum: 3 },
-        { attribute: 'int', minimum: 2 },
-        { attribute: 'wis', minimum: 2 }
+        { attribute: 'inf', minimum: 3 },
+        { attribute: 'cre', minimum: 2 }
       ]
     }
   },
@@ -47,9 +45,8 @@ const MOCK_MISSIONS: Mission[] = [
     encounterType: {
       type: 'obstacle',
       requiredStats: [
-        { attribute: 'int', minimum: 3 },
-        { attribute: 'wis', minimum: 2 },
-        { attribute: 'dex', minimum: 2 }
+        { attribute: 'cre', minimum: 3 },
+        { attribute: 'mov', minimum: 2 }
       ]
     }
   }

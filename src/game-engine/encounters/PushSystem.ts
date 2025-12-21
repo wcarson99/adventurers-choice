@@ -3,11 +3,11 @@ import { Grid, GridPosition } from '../grid/Grid';
 import { PositionComponent, AttributesComponent, PushableComponent } from '../ecs/Component';
 
 /**
- * PushSystem handles STR-based pushing mechanics
+ * PushSystem handles PWR-based pushing mechanics
  * Requirements:
- * - Character must have STR ≥ 3
+ * - Character must have PWR ≥ 3
  * - Character must be adjacent to object (on side opposite push direction)
- * - Object weight ≤ STR × 20
+ * - Object weight ≤ PWR × 20
  * - Target square must be empty
  * - Character must have enough stamina
  */
@@ -35,13 +35,13 @@ export class PushSystem {
       return { canPush: false, reason: 'Missing components' };
     }
 
-    // Check STR requirement
-    if (charAttrs.str < 3) {
-      return { canPush: false, reason: 'STR 3+ required to push' };
+    // Check PWR requirement
+    if (charAttrs.pwr < 3) {
+      return { canPush: false, reason: 'PWR 3+ required to push' };
     }
 
     // Check weight limit
-    const maxWeight = charAttrs.str * 20;
+    const maxWeight = charAttrs.pwr * 20;
     if (pushable.weight > maxWeight) {
       return { canPush: false, reason: `Object too heavy (${pushable.weight} lb > ${maxWeight} lb max)` };
     }
@@ -94,7 +94,7 @@ export class PushSystem {
     }
 
     // Calculate stamina cost
-    const staminaCost = Math.max(1, Math.ceil(pushable.weight / charAttrs.str));
+    const staminaCost = Math.max(1, Math.ceil(pushable.weight / charAttrs.pwr));
 
     // TODO: Check if character has enough stamina (need StaminaComponent)
     // For now, we'll skip this check

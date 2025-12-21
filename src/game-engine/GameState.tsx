@@ -23,12 +23,10 @@ export interface Mission {
 }
 
 export interface Attributes {
-  str: number;
-  dex: number;
-  con: number;
-  int: number;
-  wis: number;
-  cha: number;
+  pwr: number;
+  mov: number;
+  inf: number;
+  cre: number;
 }
 
 export interface Character {
@@ -138,17 +136,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } as RenderableComponent);
         world.addComponent(entityId, {
           type: 'Attributes',
-          str: hero.attributes.str,
-          dex: hero.attributes.dex,
-          con: hero.attributes.con,
-          int: hero.attributes.int,
-          wis: hero.attributes.wis,
-          cha: hero.attributes.cha
+          pwr: hero.attributes.pwr,
+          mov: hero.attributes.mov,
+          inf: hero.attributes.inf,
+          cre: hero.attributes.cre
         } as AttributesComponent);
       }
     });
 
-    // Spawn pushable crates (30 lb each - pushable by STR 3)
+    // Spawn pushable crates (30 lb each - pushable by PWR 3)
     // Simplified for testing: Place first crate directly in front of first character (warrior at 0,1)
     // Warrior at (0,1), crate at (1,1) - warrior can push it right to (2,1)
     const cratePositions = [
@@ -170,7 +166,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } as RenderableComponent);
         world.addComponent(crateId, {
           type: 'Pushable',
-          weight: 30, // 30 lb - pushable by STR 3 (cost: Math.ceil(30/3) = 10 stamina)
+          weight: 30, // 30 lb - pushable by PWR 3 (cost: Math.ceil(30/3) = 10 stamina)
           sprite: '/assets/items/crate.png'
         } as PushableComponent);
       }

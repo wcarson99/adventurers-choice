@@ -7,7 +7,7 @@
  * Stat requirement for encounters
  */
 export interface StatRequirement {
-  attribute: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+  attribute: 'pwr' | 'mov' | 'inf' | 'cre';
   minimum: number;
 }
 
@@ -92,12 +92,13 @@ export function getEncounterTypeDisplayName(encounter: EncounterType): string {
  */
 export function getStatAbbreviation(attribute: StatRequirement['attribute']): string {
   const abbreviations: Record<StatRequirement['attribute'], string> = {
-    str: 'STR',
-    dex: 'DEX',
-    con: 'CON',
-    int: 'INT',
-    wis: 'WIS',
-    cha: 'CHA',
+    pwr: 'PWR',
+    mov: 'MOV',
+    inf: 'INF',
+    cre: 'CRE',
   };
   return abbreviations[attribute];
 }
+
+
+

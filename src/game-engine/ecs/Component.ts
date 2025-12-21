@@ -31,12 +31,10 @@ export interface PlayerControlledComponent extends Component {
 
 export interface AttributesComponent extends Component {
   type: 'Attributes';
-  str: number;
-  dex: number;
-  con: number;
-  int: number;
-  wis: number;
-  cha: number;
+  pwr: number;
+  mov: number;
+  inf: number;
+  cre: number;
 }
 
 export interface PushableComponent extends Component {

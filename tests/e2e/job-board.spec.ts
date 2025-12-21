@@ -47,20 +47,17 @@ test.describe('Job Board', () => {
     await expect(page.getByTestId('mission-type-m3')).toHaveText('Obstacle');
     
     // Check that stat requirements are displayed (as badges)
-    // Combat mission (m1) should have STR 3+, DEX 2+, CON 2+
-    await expect(page.getByTestId('mission-stats-m1').getByTestId('stat-badge-str-3')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByTestId('mission-stats-m1').getByTestId('stat-badge-dex-2')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByTestId('mission-stats-m1').getByTestId('stat-badge-con-2')).toBeVisible({ timeout: 3000 });
+    // Combat mission (m1) should have PWR 3+, MOV 2+
+    await expect(page.getByTestId('mission-stats-m1').getByTestId('stat-badge-pwr-3')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('mission-stats-m1').getByTestId('stat-badge-mov-2')).toBeVisible({ timeout: 3000 });
     
-    // Trading mission (m2) should have CHA 3+, INT 2+, WIS 2+
-    await expect(page.getByTestId('mission-stats-m2').getByTestId('stat-badge-cha-3')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByTestId('mission-stats-m2').getByTestId('stat-badge-int-2')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByTestId('mission-stats-m2').getByTestId('stat-badge-wis-2')).toBeVisible({ timeout: 3000 });
+    // Trading mission (m2) should have INF 3+, CRE 2+
+    await expect(page.getByTestId('mission-stats-m2').getByTestId('stat-badge-inf-3')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('mission-stats-m2').getByTestId('stat-badge-cre-2')).toBeVisible({ timeout: 3000 });
     
-    // Obstacle mission (m3) should have INT 3+, WIS 2+, DEX 2+
-    await expect(page.getByTestId('mission-stats-m3').getByTestId('stat-badge-int-3')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByTestId('mission-stats-m3').getByTestId('stat-badge-wis-2')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByTestId('mission-stats-m3').getByTestId('stat-badge-dex-2')).toBeVisible({ timeout: 3000 });
+    // Obstacle mission (m3) should have CRE 3+, MOV 2+
+    await expect(page.getByTestId('mission-stats-m3').getByTestId('stat-badge-cre-3')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('mission-stats-m3').getByTestId('stat-badge-mov-2')).toBeVisible({ timeout: 3000 });
     
     // Verify no console errors occurred
     const errors: string[] = [];
@@ -134,3 +131,6 @@ test.describe('Job Board', () => {
     expect(scrolledTop).toBeGreaterThan(initialScrollTop);
   });
 });
+
+
+

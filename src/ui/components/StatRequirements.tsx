@@ -46,3 +46,6 @@ export const StatRequirements: React.FC<StatRequirementsProps> = ({ requiredStat
     </div>
   );
 };
+
+
+

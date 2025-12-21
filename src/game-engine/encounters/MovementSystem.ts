@@ -9,18 +9,18 @@ export interface MovementPattern {
 }
 
 /**
- * MovementSystem handles character movement based on DEX scores
+ * MovementSystem handles character movement based on MOV scores
  * Movement is FREE (no stamina cost)
  */
 export class MovementSystem {
   /**
-   * Get valid movement patterns for a character based on their DEX score
+   * Get valid movement patterns for a character based on their MOV score
    */
-  getMovementPatterns(dex: number): MovementPattern[] {
+  getMovementPatterns(mov: number): MovementPattern[] {
     const patterns: MovementPattern[] = [];
 
-    // DEX 1-3: Horizontal/Vertical only (orthogonal)
-    if (dex >= 1) {
+    // MOV 1-3: Horizontal/Vertical only (orthogonal)
+    if (mov >= 1) {
       patterns.push(
         { dx: 0, dy: -1, name: 'Up' },
         { dx: 0, dy: 1, name: 'Down' },
@@ -29,8 +29,8 @@ export class MovementSystem {
       );
     }
 
-    // DEX 4-6: Add diagonal
-    if (dex >= 4) {
+    // MOV 4-6: Add diagonal
+    if (mov >= 4) {
       patterns.push(
         { dx: -1, dy: -1, name: 'Up-Left' },
         { dx: 1, dy: -1, name: 'Up-Right' },
@@ -39,8 +39,8 @@ export class MovementSystem {
       );
     }
 
-    // DEX 7-9: Add 2-square orthogonal
-    if (dex >= 7) {
+    // MOV 7-9: Add 2-square orthogonal
+    if (mov >= 7) {
       patterns.push(
         { dx: 0, dy: -2, name: 'Up-2' },
         { dx: 0, dy: 2, name: 'Down-2' },
@@ -49,7 +49,7 @@ export class MovementSystem {
       );
     }
 
-    // DEX 10+: Extended patterns (future)
+    // MOV 10+: Extended patterns (future)
     // TODO: Add knight moves, 2-square diagonal, etc.
 
     return patterns;
@@ -63,9 +63,9 @@ export class MovementSystem {
     grid: Grid,
     characterId: number,
     currentPos: GridPosition,
-    dex: number
+    mov: number
   ): GridPosition[] {
-    const patterns = this.getMovementPatterns(dex);
+    const patterns = this.getMovementPatterns(mov);
     const validMoves: GridPosition[] = [];
 
     for (const pattern of patterns) {
@@ -117,7 +117,7 @@ export class MovementSystem {
   }
 
   /**
-   * Validate if a path step is valid for a character's DEX
+   * Validate if a path step is valid for a character's MOV
    * Checks if the step follows a valid movement pattern from the current position
    */
   validatePathStep(
@@ -126,7 +126,7 @@ export class MovementSystem {
     characterId: number,
     fromPos: GridPosition,
     toPos: GridPosition,
-    dex: number
+    mov: number
   ): boolean {
     // Calculate the delta
     const dx = toPos.x - fromPos.x;
@@ -142,7 +142,7 @@ export class MovementSystem {
     if (this.isOccupied(world, grid, toPos.x, toPos.y, characterId)) return false;
 
     // Get valid movement patterns
-    const patterns = this.getMovementPatterns(dex);
+    const patterns = this.getMovementPatterns(mov);
 
     // Check if the delta matches any valid pattern
     const matchesPattern = patterns.some(pattern => pattern.dx === dx && pattern.dy === dy);
@@ -164,7 +164,7 @@ export class MovementSystem {
   }
 
   /**
-   * Check if character can move from position A to B (respects DEX patterns)
+   * Check if character can move from position A to B (respects MOV patterns)
    */
   canMoveFromTo(
     world: World,
@@ -172,9 +172,9 @@ export class MovementSystem {
     characterId: number,
     fromPos: GridPosition,
     toPos: GridPosition,
-    dex: number
+    mov: number
   ): boolean {
-    return this.validatePathStep(world, grid, characterId, fromPos, toPos, dex);
+    return this.validatePathStep(world, grid, characterId, fromPos, toPos, mov);
   }
 
   /**

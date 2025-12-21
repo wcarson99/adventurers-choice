@@ -35,12 +35,10 @@ export interface EntityProperties {
   name?: string;
   archetype?: string;
   attributes?: {
-    str: number;
-    dex: number;
-    con: number;
-    int: number;
-    wis: number;
-    cha: number;
+    pwr: number;
+    mov: number;
+    inf: number;
+    cre: number;
   };
   sprite?: string;
   gold?: number;

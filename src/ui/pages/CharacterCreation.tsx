@@ -4,31 +4,31 @@ import { theme } from '../styles/theme';
 
 // Deterministic stats for each archetype: Primary 5, Secondary 5, Others 2
 const getDeterministicAttributes = (archetype: string): Attributes => {
-  const base: Attributes = { str: 2, dex: 2, con: 2, int: 2, wis: 2, cha: 2 };
+  const base: Attributes = { pwr: 2, mov: 2, inf: 2, cre: 2 };
   
   switch (archetype) {
     case 'Warrior':
-      return { ...base, str: 5, con: 5 };
+      return { ...base, pwr: 5, mov: 5 };
     case 'Thief':
-      return { ...base, dex: 5, str: 5 };
+      return { ...base, mov: 5, pwr: 5 };
     case 'Wizard':
-      return { ...base, int: 5, wis: 5 };
+      return { ...base, cre: 5, inf: 5 };
     case 'Cleric':
-      return { ...base, wis: 5, con: 5 };
+      return { ...base, inf: 5, cre: 5 };
     case 'Bard':
-      return { ...base, cha: 5, dex: 5 };
+      return { ...base, inf: 5, mov: 5 };
     case 'Paladin':
-      return { ...base, str: 5, cha: 5 };
+      return { ...base, pwr: 5, inf: 5 };
     default:
       return base;
   }
 };
 
-// Helper to generate random stats summing to 18, max 5, min 1 (for reroll)
+// Helper to generate random stats summing to 12, max 5, min 1 (for reroll)
 const generateRandomAttributes = (): Attributes => {
-  const attrs: (keyof Attributes)[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-  const values: Record<string, number> = { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 };
-  let pointsRemaining = 18 - 6; // Start with 1 in each, distribute remaining 12
+  const attrs: (keyof Attributes)[] = ['pwr', 'mov', 'inf', 'cre'];
+  const values: Record<string, number> = { pwr: 1, mov: 1, inf: 1, cre: 1 };
+  let pointsRemaining = 12 - 4; // Start with 1 in each, distribute remaining 8
 
   while (pointsRemaining > 0) {
     const randomAttr = attrs[Math.floor(Math.random() * attrs.length)];
@@ -45,12 +45,16 @@ const getArchetype = (attr: Attributes): string => {
   const maxVal = Math.max(...Object.values(attr));
   const highest = Object.entries(attr).filter(([_, v]) => v === maxVal).map(([k]) => k);
   
-  if (highest.includes('str')) return 'Warrior';
-  if (highest.includes('dex')) return 'Thief';
-  if (highest.includes('int')) return 'Wizard';
-  if (highest.includes('wis')) return 'Cleric';
-  if (highest.includes('cha')) return 'Bard';
-  if (highest.includes('con')) return 'Paladin';
+  if (highest.includes('pwr')) return 'Warrior';
+  if (highest.includes('mov')) return 'Thief';
+  if (highest.includes('cre')) return 'Wizard';
+  if (highest.includes('inf')) {
+    // If INF is highest, check second highest to differentiate Cleric vs Bard
+    const sorted = Object.entries(attr).sort(([,a], [,b]) => b - a);
+    if (sorted[1][0] === 'cre') return 'Cleric';
+    if (sorted[1][0] === 'mov') return 'Bard';
+    return 'Bard'; // Default to Bard if INF is highest
+  }
   return 'Adventurer';
 };
 
