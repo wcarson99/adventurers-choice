@@ -13,6 +13,7 @@ import { ActionExecutionSystem } from '../../game-engine/encounters/ActionExecut
 import { EncounterGrid } from './encounter/EncounterGrid';
 import { EncounterInfoPanel } from './encounter/EncounterInfoPanel';
 import { useMovementPlanning } from './encounter/useMovementPlanning';
+import { useSkillPlanning } from './encounter/useSkillPlanning';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -68,6 +69,26 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     onPathUpdate: () => setPathUpdateTrigger(t => t + 1),
     onTick: () => setTick(t => t + 1),
     showStatus,
+  });
+
+  // Skill planning hook - provides skill-specific handlers
+  const skillPlanning = useSkillPlanning({
+    world,
+    grid,
+    selectedCharacter,
+    selectedObject,
+    onCharacterSelect: (charId) => {
+      updateSelectedCharacter(charId);
+      if (charId === null) {
+        updateSelectedObject(null);
+      }
+    },
+    onObjectSelect: (objectId) => {
+      updateSelectedObject(objectId);
+    },
+    onValidPushDirectionsUpdate: updateValidPushDirections,
+    onTick: () => setTick(t => t + 1),
+    pushSystem,
   });
 
   // Reset systems when encounter changes
@@ -301,47 +322,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       // For movement phase, we primarily care about path planning, not object selection
       return;
     } else if (phase === 'skill') {
-      // In skill phase, select character for action planning
-      if (selectedCharacter === characterId) {
-        updateSelectedCharacter(null);
-        updateSelectedObject(null);
-        return;
-      }
-      updateSelectedCharacter(characterId);
-      updateSelectedObject(null);
-      
-      // Check if character is adjacent to any pushable objects (for skill phase)
-      const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
-      if (currentPos) {
-        const entities = world.getAllEntities();
-        const adjacentObjects: Array<{ id: number; pushActions: Array<{ direction: { dx: number; dy: number }; staminaCost: number }> }> = [];
-        
-        for (const entityId of entities) {
-          const pushable = world.getComponent<PushableComponent>(entityId, 'Pushable');
-          if (!pushable) continue;
-          
-          const objPos = world.getComponent<PositionComponent>(entityId, 'Position');
-          if (!objPos) continue;
-          
-          const distance = grid.getDistance({ x: currentPos.x, y: currentPos.y }, objPos);
-          if (distance === 1) {
-            // Character is adjacent to this object
-            const pushActions = pushSystem.getValidPushActions(world, grid, characterId, entityId);
-            if (pushActions.length > 0) {
-              adjacentObjects.push({ id: entityId, pushActions });
-            }
-          }
-        }
-        
-        // If adjacent to exactly one object, auto-select it and show push directions
-        if (adjacentObjects.length === 1) {
-          updateSelectedObject(adjacentObjects[0].id);
-          updateValidPushDirections(adjacentObjects[0].pushActions.map(a => ({ ...a.direction, staminaCost: a.staminaCost })));
-        } else {
-          updateSelectedObject(null);
-          updateValidPushDirections([]);
-        }
-      }
+      // Use skill planning hook handler
+      skillPlanning.handleCharacterClick(characterId);
     }
   };
 
@@ -357,49 +339,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
     // Skill phase - allow selecting characters and items
     if (phase === 'skill') {
-      console.log('=== Skill Phase Tile Click ===');
-      console.log('Clicked tile:', x, y);
-      
-      const entities = world.getAllEntities();
-      const clickedEntity = entities.find(id => {
-        const p = world.getComponent<PositionComponent>(id, 'Position');
-        return p && p.x === x && p.y === y;
-      });
-      
-      console.log('Clicked entity ID:', clickedEntity);
-      
-      if (clickedEntity) {
-        const r = world.getComponent<RenderableComponent>(clickedEntity, 'Renderable');
-        const attrs = world.getComponent<AttributesComponent>(clickedEntity, 'Attributes');
-        const pushable = world.getComponent<PushableComponent>(clickedEntity, 'Pushable');
-        
-        console.log('Entity components:', { 
-          hasRenderable: !!r, 
-          hasAttributes: !!attrs, 
-          hasPushable: !!pushable,
-          renderableColor: r?.color 
-        });
-        
-        if (r && attrs && r.color === theme.colors.accent) {
-          // Clicked on a character
-          console.log('✅ Clicked on character:', clickedEntity);
-          handleCharacterClick(clickedEntity);
-        } else if (pushable) {
-          // Clicked on an item (crate)
-          console.log('✅ Clicked on crate:', clickedEntity);
-          console.log('Setting selectedObject to:', clickedEntity);
-          setSelectedObject(clickedEntity);
-          setTick(t => t + 1); // Force re-render to update available actions
-          // Re-check available actions for selected character if one is selected
-          if (selectedCharacter) {
-            console.log('Character already selected, actions should update');
-          }
-        } else {
-          console.log('❌ Clicked entity is neither character nor crate');
-        }
-      } else {
-        console.log('❌ No entity found at clicked position');
-      }
+      // Use skill planning hook handler
+      skillPlanning.handleTileClick(x, y);
       return;
     }
 
