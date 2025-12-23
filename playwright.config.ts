@@ -28,20 +28,11 @@ export default defineConfig({
   },
 
   /* Configure projects for major browsers */
+  /* MVP: Only Chromium for faster test runs */
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
     },
   ],
 
