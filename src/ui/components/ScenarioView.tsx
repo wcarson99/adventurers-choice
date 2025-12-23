@@ -6,6 +6,7 @@ import { ValidMove } from '../../game-engine/encounters/EncounterStateManager';
 import { GridController } from '../../game-engine/encounters/GridController';
 import { ScenarioGrid } from './scenario/ScenarioGrid';
 import { ScenarioInfoPanel } from './scenario/ScenarioInfoPanel';
+import { SUCCESS_MESSAGE_DURATION_MS } from '../constants';
 
 interface ScenarioViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -278,7 +279,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
         );
 
         if (result.success) {
-          showStatus(`Moved! ${result.apRemaining} AP remaining`, 'success');
+          showStatus(`Moved! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);
           setTick(t => t + 1);
 
           // Check win condition
@@ -319,7 +320,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
         );
 
         if (result.success) {
-          showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success');
+          showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);
           setSelectedObject(null);
           setTick(t => t + 1);
 
@@ -388,7 +389,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       // Round completed - start next round
       gridControllerRef.current.startRound(getPlayerCharacters, world);
       setCurrentRound(gridControllerRef.current.getCurrentRound());
-      showStatus('Round complete! Starting next round...', 'success');
+      showStatus('Round complete! Starting next round...', 'success', SUCCESS_MESSAGE_DURATION_MS);
       
       // Auto-select first character of new round
       const nextActiveChar = gridControllerRef.current.getCurrentActiveCharacter();
@@ -477,7 +478,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       );
 
       if (result.success) {
-        showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success');
+        showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);
         setSelectedObject(null);
         setTick(t => t + 1);
 
@@ -514,7 +515,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     );
 
     if (result.success) {
-      showStatus(`Turned! ${result.apRemaining} AP remaining`, 'success');
+      showStatus(`Turned! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);
       setSelectingDirection(false);
       setTick(t => t + 1);
 

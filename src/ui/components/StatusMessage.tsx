@@ -3,9 +3,14 @@ import { useGame } from '../../game-engine/GameState';
 import { theme } from '../styles/theme';
 
 export const StatusMessage: React.FC = () => {
-  const { statusMessage, setStatusMessage } = useGame();
+  const { statusMessage, setStatusMessage, currentView } = useGame();
 
   if (!statusMessage) return null;
+
+  // Don't show error, success, or info messages in MISSION view - they appear in the info panel instead
+  if ((statusMessage.type === 'error' || statusMessage.type === 'success' || statusMessage.type === 'info') && currentView === 'MISSION') {
+    return null;
+  }
 
   const backgroundColor = 
     statusMessage.type === 'error' ? '#d32f2f' :

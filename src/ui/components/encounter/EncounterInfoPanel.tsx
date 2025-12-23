@@ -5,9 +5,8 @@ import { MovementPlan } from '../../../game-engine/encounters/MovementPlan';
 import { PlanningPhase } from '../../../game-engine/encounters/EncounterPhaseManager';
 import { PlannedAction } from '../../../game-engine/encounters/EncounterStateManager';
 import { theme } from '../../styles/theme';
-import { useGame } from '../../../game-engine/GameState';
 
-interface ScenarioInfoPanelProps {
+interface EncounterInfoPanelProps {
   phase: PlanningPhase; // @deprecated - kept for backward compatibility
   currentTurn: number; // Now represents round number
   activeMission?: { title: string; description: string; days?: number };
@@ -47,11 +46,11 @@ interface ScenarioInfoPanelProps {
 // Runtime check: This will fail if old code tries to import this module
 // VERSION 2.1.0 - Force module reload
 if (typeof window !== 'undefined') {
-  (window as any).__SCENARIO_INFO_PANEL_V2__ = true;
-  (window as any).__SCENARIO_INFO_PANEL_VERSION__ = '2.1.0';
+  (window as any).__ENCOUNTER_INFO_PANEL_V2__ = true;
+  (window as any).__ENCOUNTER_INFO_PANEL_VERSION__ = '2.1.0';
 }
 
-export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
+export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
   phase: _phase, // @deprecated
   currentTurn,
   activeMission,
@@ -86,22 +85,21 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
   onDirectionSelect: _onDirectionSelect,
 }) => {
   // CRITICAL CHECK: Verify new code is running
-  if (typeof window !== 'undefined' && !(window as any).__SCENARIO_INFO_PANEL_V2__) {
-    console.error('[ScenarioInfoPanel] FATAL: Old code detected! Module not properly loaded.');
-    throw new Error('Old ScenarioInfoPanel code detected - browser cache issue');
+  if (typeof window !== 'undefined' && !(window as any).__ENCOUNTER_INFO_PANEL_V2__) {
+    console.error('[EncounterInfoPanel] FATAL: Old code detected! Module not properly loaded.');
+    throw new Error('Old EncounterInfoPanel code detected - browser cache issue');
   }
   
   const AP_SYSTEM_VERSION = '2.0.0';
-  console.log(`[ScenarioInfoPanel] ✅ AP System ${AP_SYSTEM_VERSION} LOADED - New code is running!`);
+  console.log(`[EncounterInfoPanel] ✅ AP System ${AP_SYSTEM_VERSION} LOADED - New code is running!`);
   
   const currentActiveCharacter = getCurrentActiveCharacter ? getCurrentActiveCharacter() : null;
-  const { statusMessage, setStatusMessage } = useGame();
   
   // Debug logging
   React.useEffect(() => {
-      console.log('[ScenarioInfoPanel] Component mounted, currentActiveCharacter:', currentActiveCharacter);
+    console.log('[EncounterInfoPanel] Component mounted, currentActiveCharacter:', currentActiveCharacter);
     if (currentActiveCharacter === null && getCurrentActiveCharacter) {
-      console.log('[ScenarioInfoPanel] WARNING: currentActiveCharacter is null - round may not be initialized');
+      console.log('[EncounterInfoPanel] WARNING: currentActiveCharacter is null - round may not be initialized');
     } else if (currentActiveCharacter !== null) {
       console.log('[EncounterInfoPanel] currentActiveCharacter:', currentActiveCharacter);
     }
@@ -119,7 +117,7 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
       overflowY: 'auto',
       boxShadow: '-4px 0 6px rgba(0,0,0,0.3)'
     }}>
-      {/* Mission/Campaign Title - Centered */}
+      {/* Mission/Campaign Title - Compact */}
       {(activeMission || (activeJob && currentScenarioIndex !== undefined)) && (
         <div style={{
           marginBottom: '0.75rem',
@@ -130,8 +128,7 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
             fontSize: '1.2rem', 
             margin: '0 0 0.25rem 0', 
             color: theme.colors.accent,
-            fontWeight: 'bold',
-            textAlign: 'center'
+            fontWeight: 'bold'
           }}>
             {activeMission 
               ? activeMission.title 
@@ -144,8 +141,7 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
             margin: 0, 
             color: theme.colors.text,
             opacity: 0.8,
-            lineHeight: '1.2',
-            textAlign: 'center'
+            lineHeight: '1.2'
           }}>
             {activeMission 
               ? activeMission.description 
@@ -159,8 +155,7 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
               margin: '0.25rem 0 0 0', 
               color: theme.colors.accentLight,
               opacity: 0.7,
-              fontStyle: 'italic',
-              textAlign: 'center'
+              fontStyle: 'italic'
             }}>
               Scenario {currentScenarioIndex + 1} of {activeJob.scenarios.length}
             </p>
@@ -168,51 +163,57 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
         </div>
       )}
 
-      {/* Selected Character Info */}
-      {selectedCharacter && !selectedObject && (() => {
-        const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
-        
-        if (!attrs) return null;
-        
-        // Get character name from party
-        const charIndex = Array.from(world.getAllEntities()).indexOf(selectedCharacter);
-        const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
-        const archetype = party[charIndex]?.archetype || 'Adventurer';
-        
-        return (
-          <div style={{
-            padding: '0.75rem',
-            backgroundColor: theme.colors.background,
-            borderRadius: '6px',
-            color: theme.colors.text,
-            marginBottom: '0.75rem',
-            border: `1px solid ${theme.colors.imageBorder}`
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: '0.25rem', color: theme.colors.accent, fontSize: '1rem' }}>
-              {charName}
-            </h3>
-            <div style={{ marginBottom: '0.5rem', fontSize: '0.75rem', color: theme.colors.accentLight }}>
-              {archetype}
+      {/* Instructions, Round, and Current Character - Compact */}
+      <div style={{
+        marginBottom: '0.75rem',
+        padding: '0.5rem',
+        backgroundColor: theme.colors.background,
+        borderRadius: '6px',
+        color: theme.colors.text,
+        fontSize: '0.85rem',
+        lineHeight: '1.3'
+      }}>
+        <div style={{ marginBottom: '0.25rem', fontWeight: 'bold' }}>
+          {getInstructions()}
+        </div>
+        <div style={{ fontSize: '0.8rem', opacity: 0.8, display: 'flex', gap: '1rem' }}>
+          <span>Round: {currentTurn}</span>
+          {currentActiveCharacter !== null && getCharacterAP && (
+            <span style={{ color: theme.colors.accent, fontWeight: 'bold' }}>
+              AP: {getCharacterAP(currentActiveCharacter)}
+            </span>
+          )}
+        </div>
+        {currentActiveCharacter !== null && (() => {
+          const charIndex = Array.from(world.getAllEntities()).indexOf(currentActiveCharacter);
+          const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
+          return (
+            <div style={{ fontSize: '0.75rem', opacity: 0.9, marginTop: '0.25rem', color: theme.colors.accent }}>
+              Active: {charName}
             </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-              <div>PWR: {attrs.pwr}</div>
-              <div>MOV: {attrs.mov}</div>
-              <div>INF: {attrs.inf}</div>
-              <div>CRE: {attrs.cre}</div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.8rem' }}>
-              <div>HP: 10/10</div>
-              <div>Stamina: 10/10</div>
-              <div>Gold: {party[charIndex]?.gold || 0}</div>
-              <div>Food: {party[charIndex]?.food || 0}</div>
-            </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
+      </div>
 
-      {/* Action Selection */}
+      {/* Fallback: Show message if round not started */}
+      {currentActiveCharacter === null && (
+        <div style={{
+          marginBottom: '0.75rem',
+          padding: '0.75rem',
+          backgroundColor: theme.colors.background,
+          borderRadius: '6px',
+          border: `1px solid ${theme.colors.imageBorder}`,
+          color: theme.colors.text,
+          fontSize: '0.85rem',
+          fontStyle: 'italic',
+          opacity: 0.8,
+          textAlign: 'center'
+        }}>
+          Waiting for round to start...
+        </div>
+      )}
+
+      {/* Current Character Actions - Action Point System */}
       {currentActiveCharacter !== null && (() => {
         const availableActions = getAvailableActions(currentActiveCharacter);
         const currentAP = getCharacterAP ? getCharacterAP(currentActiveCharacter) : 50;
@@ -350,6 +351,51 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
         );
       })()}
 
+
+      {/* Selected Entity Stats - Only show one at a time */}
+      {selectedCharacter && !selectedObject && (() => {
+        const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
+        
+        if (!attrs) return null;
+        
+        // Get character name from party
+        const charIndex = Array.from(world.getAllEntities()).indexOf(selectedCharacter);
+        const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
+        const archetype = party[charIndex]?.archetype || 'Adventurer';
+        
+        return (
+          <div style={{
+            padding: '0.75rem',
+            backgroundColor: theme.colors.background,
+            borderRadius: '6px',
+            color: theme.colors.text,
+            marginBottom: '0.75rem',
+            border: `1px solid ${theme.colors.imageBorder}`
+          }}>
+            <h3 style={{ marginTop: 0, marginBottom: '0.25rem', color: theme.colors.accent, fontSize: '1rem' }}>
+              {charName}
+            </h3>
+            <div style={{ marginBottom: '0.5rem', fontSize: '0.75rem', color: theme.colors.accentLight }}>
+              {archetype}
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+              <div>PWR: {attrs.pwr}</div>
+              <div>MOV: {attrs.mov}</div>
+              <div>INF: {attrs.inf}</div>
+              <div>CRE: {attrs.cre}</div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.8rem' }}>
+              <div>HP: 10/10</div>
+              <div>Stamina: 10/10</div>
+              <div>Gold: {party[charIndex]?.gold || 0}</div>
+              <div>Food: {party[charIndex]?.food || 0}</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Item Stats - When item selected (only if no character selected) */}
       {selectedObject && !selectedCharacter && (() => {
         const pushable = world.getComponent<PushableComponent>(selectedObject, 'Pushable');
@@ -378,51 +424,6 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
           </div>
         );
       })()}
-
-      {/* Status Message - At bottom of info panel (errors, success, and info) */}
-      {statusMessage && (statusMessage.type === 'error' || statusMessage.type === 'success' || statusMessage.type === 'info') && (
-        <div style={{
-          marginTop: 'auto',
-          padding: '0.75rem',
-          backgroundColor: statusMessage.type === 'error' 
-            ? '#d32f2f' 
-            : statusMessage.type === 'success' 
-            ? theme.colors.success 
-            : theme.colors.accent,
-          color: '#fff',
-          borderRadius: '6px',
-          fontSize: '0.9rem',
-          fontWeight: 'bold',
-          textAlign: 'center',
-          border: `1px solid ${theme.colors.imageBorder}`,
-          position: 'relative'
-        }}>
-          {statusMessage.text}
-          <button
-            onClick={() => setStatusMessage(null)}
-            style={{
-              position: 'absolute',
-              top: '0.5rem',
-              right: '0.5rem',
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              color: '#fff',
-              fontSize: '1.2rem',
-              cursor: 'pointer',
-              borderRadius: '4px',
-              width: '24px',
-              height: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              lineHeight: '1'
-            }}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-      )}
     </div>
   );
 };
