@@ -43,10 +43,33 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       console.log('[EncounterView] Round started:', round, 'Active character:', activeChar);
       setCurrentRound(round);
       // Sync React state with state manager
-      setSelectedCharacter(null);
       setSelectedObject(null);
-      setValidMoves([]);
       setValidPushDirections([]);
+      
+      // Auto-select first character and default to Move or Pass
+      if (activeChar !== null && grid) {
+        updateSelectedCharacter(activeChar);
+        const attrs = world.getComponent<AttributesComponent>(activeChar, 'Attributes');
+        const pos = world.getComponent<PositionComponent>(activeChar, 'Position');
+        
+        // Check if character can afford Move (15 AP)
+        const canAffordMove = encounterControllerRef.current.canAffordAction(activeChar, 'Move');
+        
+        if (canAffordMove && attrs && pos) {
+          // Default to Move: calculate and show valid moves
+          const moves = movementSystem.getValidMoves(world, grid, activeChar, { x: pos.x, y: pos.y }, attrs.mov);
+          updateValidMoves(moves);
+          console.log('[EncounterView] Auto-selected character, defaulting to Move action');
+        } else {
+          // Default to Pass: clear moves (Pass will be the only available action)
+          setValidMoves([]);
+          console.log('[EncounterView] Auto-selected character, defaulting to Pass action (insufficient AP for Move)');
+        }
+      } else {
+        setSelectedCharacter(null);
+        setValidMoves([]);
+      }
+      
       // @deprecated - planned actions no longer used
       setTick(t => t + 1); // Force re-render
     }
@@ -84,6 +107,29 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const updateValidMoves = (moves: ValidMove[]) => {
     encounterControllerRef.current.setValidMoves(moves);
     setValidMoves(moves);
+  };
+
+  // Helper to keep character selected and default to Move or Pass after action execution
+  const keepCharacterSelectedWithDefaultAction = (characterId: number) => {
+    if (!grid) return;
+    
+    // Keep character selected
+    updateSelectedCharacter(characterId);
+    
+    const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
+    const pos = world.getComponent<PositionComponent>(characterId, 'Position');
+    
+    // Check if character can afford Move (15 AP)
+    const canAffordMove = encounterControllerRef.current.canAffordAction(characterId, 'Move');
+    
+    if (canAffordMove && attrs && pos) {
+      // Default to Move: calculate and show valid moves
+      const moves = movementSystem.getValidMoves(world, grid, characterId, { x: pos.x, y: pos.y }, attrs.mov);
+      updateValidMoves(moves);
+    } else {
+      // Default to Pass: clear moves
+      setValidMoves([]);
+    }
   };
 
   // @deprecated - planned actions no longer used, actions execute immediately
@@ -206,16 +252,17 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
         if (result.success) {
           showStatus(`Moved! ${result.apRemaining} AP remaining`, 'success');
-          // Clear selection and update valid moves
-          updateSelectedCharacter(null);
-          updateValidMoves([]);
           setTick(t => t + 1);
 
           // Check win condition
           const allInExit = encounterControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
           if (allInExit) {
             handleWinCondition();
+            return;
           }
+
+          // Keep character selected and default to Move or Pass
+          keepCharacterSelectedWithDefaultAction(selectedCharacter);
         } else {
           showStatus(result.error || 'Move failed', 'error');
         }
@@ -246,8 +293,6 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
         if (result.success) {
           showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success');
-          updateSelectedCharacter(null);
-          updateValidMoves([]);
           setSelectedObject(null);
           setTick(t => t + 1);
 
@@ -255,7 +300,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           const allInExit = encounterControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
           if (allInExit) {
             handleWinCondition();
+            return;
           }
+
+          // Keep character selected and default to Move or Pass
+          keepCharacterSelectedWithDefaultAction(selectedCharacter);
         } else {
           showStatus(result.error || 'Push failed', 'error');
         }
@@ -313,16 +362,55 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       encounterControllerRef.current.startRound(getPlayerCharacters, world);
       setCurrentRound(encounterControllerRef.current.getCurrentRound());
       showStatus('Round complete! Starting next round...', 'success');
+      
+      // Auto-select first character of new round
+      const nextActiveChar = encounterControllerRef.current.getCurrentActiveCharacter();
+      if (nextActiveChar !== null && grid) {
+        updateSelectedCharacter(nextActiveChar);
+        const attrs = world.getComponent<AttributesComponent>(nextActiveChar, 'Attributes');
+        const pos = world.getComponent<PositionComponent>(nextActiveChar, 'Position');
+        
+        // Check if character can afford Move (15 AP)
+        const canAffordMove = encounterControllerRef.current.canAffordAction(nextActiveChar, 'Move');
+        
+        if (canAffordMove && attrs && pos) {
+          // Default to Move: calculate and show valid moves
+          const moves = movementSystem.getValidMoves(world, grid, nextActiveChar, { x: pos.x, y: pos.y }, attrs.mov);
+          updateValidMoves(moves);
+        } else {
+          // Default to Pass: clear moves
+          setValidMoves([]);
+        }
+      } else {
+        updateSelectedCharacter(null);
+        setValidMoves([]);
+      }
     } else {
-      // Character passed, next character's turn
+      // Next character's turn - auto-select and default to Move or Pass
       const nextCharacter = encounterControllerRef.current.getCurrentActiveCharacter();
-      if (nextCharacter !== null) {
+      if (nextCharacter !== null && grid) {
+        updateSelectedCharacter(nextCharacter);
+        const attrs = world.getComponent<AttributesComponent>(nextCharacter, 'Attributes');
+        const pos = world.getComponent<PositionComponent>(nextCharacter, 'Position');
+        
+        // Check if character can afford Move (15 AP)
+        const canAffordMove = encounterControllerRef.current.canAffordAction(nextCharacter, 'Move');
+        
+        if (canAffordMove && attrs && pos) {
+          // Default to Move: calculate and show valid moves
+          const moves = movementSystem.getValidMoves(world, grid, nextCharacter, { x: pos.x, y: pos.y }, attrs.mov);
+          updateValidMoves(moves);
+        } else {
+          // Default to Pass: clear moves
+          setValidMoves([]);
+        }
         showStatus('Turn passed', 'info');
+      } else {
+        updateSelectedCharacter(null);
+        setValidMoves([]);
       }
     }
     
-    updateSelectedCharacter(null);
-    updateValidMoves([]);
     setSelectedObject(null);
     setTick(t => t + 1);
   };
@@ -351,8 +439,6 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
       if (result.success) {
         showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success');
-        updateSelectedCharacter(null);
-        updateValidMoves([]);
         setSelectedObject(null);
         setTick(t => t + 1);
 
@@ -360,7 +446,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         const allInExit = encounterControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
         if (allInExit) {
           handleWinCondition();
+          return;
         }
+
+        // Keep character selected and default to Move or Pass
+        keepCharacterSelectedWithDefaultAction(currentActiveCharacter);
       } else {
         showStatus(result.error || 'Push failed', 'error');
       }
