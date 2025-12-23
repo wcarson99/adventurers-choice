@@ -33,9 +33,20 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
   const movementSystem = gridControllerRef.current.getMovementSystem();
   const pushSystem = gridControllerRef.current.getPushSystem();
 
-  // Reset systems and start round when scenario changes
+  // Get all player characters (used in multiple places)
+  const getPlayerCharacters = () => {
+    if (!world) return [];
+    const entities = world.getAllEntities();
+    return entities.filter(id => {
+      const r = world.getComponent<RenderableComponent>(id, 'Renderable');
+      return r && r.color === theme.colors.accent;
+    });
+  };
+
+  // Reset systems and start round when scenario/mission changes
   React.useEffect(() => {
-    if (currentScenarioIndex !== undefined && world) {
+    // Initialize for both job mode (currentScenarioIndex) and random/mission mode (activeMission)
+    if (world && grid) {
       gridControllerRef.current.reset();
       // Start first round
       gridControllerRef.current.startRound(getPlayerCharacters, world);
@@ -74,7 +85,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       // @deprecated - planned actions no longer used
       setTick(t => t + 1); // Force re-render
     }
-  }, [currentScenarioIndex, world]);
+  }, [currentScenarioIndex, activeMission, world, grid]);
 
 
   if (!grid || !world) return <div>Loading Scenario...</div>;
@@ -134,15 +145,6 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
   };
 
   // @deprecated - planned actions no longer used, actions execute immediately
-
-  // Get all player characters
-  const getPlayerCharacters = () => {
-    const entities = world.getAllEntities();
-    return entities.filter(id => {
-      const r = world.getComponent<RenderableComponent>(id, 'Renderable');
-      return r && r.color === theme.colors.accent;
-    });
-  };
 
   // Get available actions for a character (filtered by AP affordability)
   const getAvailableActions = (characterId: number): Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> => {
