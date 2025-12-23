@@ -126,6 +126,28 @@
     <div id="game-container">
       <div id="root"></div>
     </div>
+    <script>
+      // Force cache invalidation on load
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      // Clear cache and reload if old version detected
+      if (localStorage.getItem('app_version') !== '2.0.0-AP-SYSTEM') {
+        console.log('Clearing cache for AP System update...');
+        localStorage.clear();
+        sessionStorage.clear();
+        localStorage.setItem('app_version', '2.0.0-AP-SYSTEM');
+        if (caches) {
+          caches.keys().then(names => {
+            names.forEach(name => caches.delete(name));
+          });
+        }
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -7,64 +7,99 @@ import { PlannedAction } from '../../../game-engine/encounters/EncounterStateMan
 import { theme } from '../../styles/theme';
 
 interface EncounterInfoPanelProps {
-  phase: PlanningPhase;
-  currentTurn: number;
+  phase: PlanningPhase; // @deprecated - kept for backward compatibility
+  currentTurn: number; // Now represents round number
   activeMission?: { title: string; description: string; days?: number };
   activeCampaign?: { name: string; encounters: Array<{ name: string; description: string }> };
   currentEncounterIndex?: number;
   selectedCharacter: number | null;
   selectedObject: number | null;
-  plannedActions: PlannedAction[];
-  movementPlan: MovementPlan;
+  plannedActions: PlannedAction[]; // @deprecated - no longer used
+  movementPlan: MovementPlan; // @deprecated - no longer used
   world: World;
   party: Array<{ name: string; archetype?: string; gold?: number; food?: number }>;
-  pathUpdateTrigger: number;
+  pathUpdateTrigger: number; // @deprecated - no longer used
   getInstructions: () => string;
   getPlayerCharacters: () => number[];
   onCharacterClick: (characterId: number) => void;
-  onUndoLastStep: () => void;
-  onClearAllMovements: () => void;
-  onPlanSkills: () => void;
-  onExecuteActions: () => void;
-  onBackToMovement: () => void;
-  onActionSelect: (actionName: string) => void;
+  onUndoLastStep: () => void; // @deprecated - no longer used
+  onClearAllMovements: () => void; // @deprecated - no longer used
+  onPlanSkills: () => void; // @deprecated - no longer used
+  onExecuteActions: () => void; // @deprecated - no longer used
+  onBackToMovement: () => void; // @deprecated - no longer used
+  onActionSelect: (actionName: string, targetId?: number) => void; // Updated to support targetId
   getAvailableActions: (characterId: number) => Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }>;
-  onExecuteFreeMoves?: () => void;
-  onMoveActionUp?: (index: number) => void;
-  onMoveActionDown?: (index: number) => void;
-  onRemoveAction?: (index: number) => void;
-  validateAndGetExecuteButtonState?: () => { canExecute: boolean; invalidReasons: string[] };
+  onExecuteFreeMoves?: () => void; // @deprecated - no longer used
+  onMoveActionUp?: (index: number) => void; // @deprecated - no longer used
+  onMoveActionDown?: (index: number) => void; // @deprecated - no longer used
+  onRemoveAction?: (index: number) => void; // @deprecated - no longer used
+  validateAndGetExecuteButtonState?: () => { canExecute: boolean; invalidReasons: string[] }; // @deprecated - no longer used
+  // New props for action point system
+  getCurrentActiveCharacter?: () => number | null;
+  getCharacterAP?: (characterId: number) => number;
+  onPass?: () => void;
+}
+
+// Runtime check: This will fail if old code tries to import this module
+// VERSION 2.1.0 - Force module reload
+if (typeof window !== 'undefined') {
+  (window as any).__ENCOUNTER_INFO_PANEL_V2__ = true;
+  (window as any).__ENCOUNTER_INFO_PANEL_VERSION__ = '2.1.0';
 }
 
 export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
-  phase,
+  phase: _phase, // @deprecated
   currentTurn,
   activeMission,
   activeCampaign,
   currentEncounterIndex,
   selectedCharacter,
   selectedObject,
-  plannedActions,
-  movementPlan,
+  plannedActions: _plannedActions, // @deprecated
+  movementPlan: _movementPlan, // @deprecated
   world,
   party,
-  pathUpdateTrigger,
+  pathUpdateTrigger: _pathUpdateTrigger, // @deprecated
   getInstructions,
   getPlayerCharacters,
   onCharacterClick,
-  onUndoLastStep,
-  onClearAllMovements,
-  onPlanSkills,
-  onExecuteActions,
-  onBackToMovement,
+  onUndoLastStep: _onUndoLastStep, // @deprecated
+  onClearAllMovements: _onClearAllMovements, // @deprecated
+  onPlanSkills: _onPlanSkills, // @deprecated
+  onExecuteActions: _onExecuteActions, // @deprecated
+  onBackToMovement: _onBackToMovement, // @deprecated
   onActionSelect,
   getAvailableActions,
-  onExecuteFreeMoves,
-  onMoveActionUp,
-  onMoveActionDown,
-  onRemoveAction,
-  validateAndGetExecuteButtonState,
+  onExecuteFreeMoves: _onExecuteFreeMoves, // @deprecated
+  onMoveActionUp: _onMoveActionUp, // @deprecated
+  onMoveActionDown: _onMoveActionDown, // @deprecated
+  onRemoveAction: _onRemoveAction, // @deprecated
+  validateAndGetExecuteButtonState: _validateAndGetExecuteButtonState, // @deprecated
+  getCurrentActiveCharacter,
+  getCharacterAP,
+  onPass,
 }) => {
+  // CRITICAL CHECK: Verify new code is running
+  if (typeof window !== 'undefined' && !(window as any).__ENCOUNTER_INFO_PANEL_V2__) {
+    console.error('[EncounterInfoPanel] FATAL: Old code detected! Module not properly loaded.');
+    throw new Error('Old EncounterInfoPanel code detected - browser cache issue');
+  }
+  
+  const AP_SYSTEM_VERSION = '2.0.0';
+  console.log(`[EncounterInfoPanel] ✅ AP System ${AP_SYSTEM_VERSION} LOADED - New code is running!`);
+  
+  const currentActiveCharacter = getCurrentActiveCharacter ? getCurrentActiveCharacter() : null;
+  
+  // Debug logging
+  React.useEffect(() => {
+    console.log('[EncounterInfoPanel] Component mounted, currentActiveCharacter:', currentActiveCharacter);
+    if (currentActiveCharacter === null && getCurrentActiveCharacter) {
+      console.log('[EncounterInfoPanel] WARNING: currentActiveCharacter is null - round may not be initialized');
+    } else if (currentActiveCharacter !== null) {
+      console.log('[EncounterInfoPanel] currentActiveCharacter:', currentActiveCharacter);
+    }
+  }, [currentActiveCharacter, getCurrentActiveCharacter]);
+  
   return (
     <div style={{
       width: '480px',
@@ -123,7 +158,7 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
         </div>
       )}
 
-      {/* Instructions and Turn Counter - Compact */}
+      {/* Instructions, Round, and Current Character - Compact */}
       <div style={{
         marginBottom: '0.75rem',
         padding: '0.5rem',
@@ -136,14 +171,50 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
         <div style={{ marginBottom: '0.25rem', fontWeight: 'bold' }}>
           {getInstructions()}
         </div>
-        <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>
-          Turn: {currentTurn}
+        <div style={{ fontSize: '0.8rem', opacity: 0.8, display: 'flex', gap: '1rem' }}>
+          <span>Round: {currentTurn}</span>
+          {currentActiveCharacter !== null && getCharacterAP && (
+            <span style={{ color: theme.colors.accent, fontWeight: 'bold' }}>
+              AP: {getCharacterAP(currentActiveCharacter)}
+            </span>
+          )}
         </div>
+        {currentActiveCharacter !== null && (() => {
+          const charIndex = Array.from(world.getAllEntities()).indexOf(currentActiveCharacter);
+          const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
+          return (
+            <div style={{ fontSize: '0.75rem', opacity: 0.9, marginTop: '0.25rem', color: theme.colors.accent }}>
+              Active: {charName}
+            </div>
+          );
+        })()}
       </div>
 
-      {/* Free Actions - Movement Planning Phase - Compact */}
-      {phase === 'movement' && (() => {
-        const playerCharacters = getPlayerCharacters();
+      {/* Fallback: Show message if round not started */}
+      {currentActiveCharacter === null && (
+        <div style={{
+          marginBottom: '0.75rem',
+          padding: '0.75rem',
+          backgroundColor: theme.colors.background,
+          borderRadius: '6px',
+          border: `1px solid ${theme.colors.imageBorder}`,
+          color: theme.colors.text,
+          fontSize: '0.85rem',
+          fontStyle: 'italic',
+          opacity: 0.8,
+          textAlign: 'center'
+        }}>
+          Waiting for round to start...
+        </div>
+      )}
+
+      {/* Current Character Actions - Action Point System */}
+      {currentActiveCharacter !== null && (() => {
+        const availableActions = getAvailableActions(currentActiveCharacter);
+        const currentAP = getCharacterAP ? getCharacterAP(currentActiveCharacter) : 50;
+        const charIndex = Array.from(world.getAllEntities()).indexOf(currentActiveCharacter);
+        const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
+        const isSelected = selectedCharacter === currentActiveCharacter;
         
         return (
           <div style={{
@@ -157,373 +228,84 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
               marginBottom: '0.5rem', 
               color: theme.colors.accent,
               fontSize: '0.9rem',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              Free Actions
+              <span>{charName}</span>
+              <span style={{ fontSize: '0.85rem', color: theme.colors.accentLight }}>
+                {currentAP} AP
+              </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-              {playerCharacters.map(charId => {
-                const charIndex = Array.from(world.getAllEntities()).indexOf(charId);
-                const charName = party[charIndex]?.name || `C${charIndex + 1}`;
-                const path = movementPlan.getPath(charId);
-                const pathSteps = path ? path.steps.length : 0;
-                const isSelected = selectedCharacter === charId;
+            
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {availableActions.map((action, index) => {
+                const canAfford = currentAP >= action.cost;
+                const isPass = action.name === 'Pass';
                 
                 return (
-                  <div
-                    key={charId}
-                    style={{
-                      padding: '0.5rem',
-                      backgroundColor: isSelected 
-                        ? theme.colors.accent 
-                        : theme.colors.cardBackground,
-                      borderRadius: '4px',
-                      border: isSelected 
-                        ? `2px solid ${theme.colors.accentLight}` 
-                        : `1px solid ${theme.colors.imageBorder}`,
-                      fontSize: '0.75rem',
-                      color: isSelected ? theme.colors.background : theme.colors.text,
-                      cursor: 'pointer'
+                  <button
+                    key={index}
+                    onClick={() => {
+                      if (action.name === 'Pass' && onPass) {
+                        onPass();
+                      } else {
+                        onActionSelect(action.name, action.targetId);
+                      }
                     }}
-                    onClick={() => onCharacterClick(charId)}
-                    title={pathSteps > 0 ? `${pathSteps} step${pathSteps !== 1 ? 's' : ''} planned` : 'No path planned'}
+                    disabled={!canAfford && !isPass}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      fontSize: '0.85rem',
+                      backgroundColor: isPass 
+                        ? theme.colors.success 
+                        : canAfford 
+                          ? theme.colors.accent 
+                          : theme.colors.imageBackground,
+                      color: theme.colors.text,
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: (canAfford || isPass) ? 'pointer' : 'not-allowed',
+                      fontWeight: 'bold',
+                      opacity: (canAfford || isPass) ? 1 : 0.5,
+                      textAlign: 'left'
+                    }}
+                    title={!canAfford && !isPass ? `Insufficient AP (need ${action.cost}, have ${currentAP})` : ''}
                   >
-                    <div style={{ fontWeight: 'bold', marginBottom: '0.15rem', fontSize: '0.8rem' }}>
-                      {charName}
-                    </div>
-                    {pathSteps > 0 ? (
-                      <div style={{ fontSize: '0.7rem', opacity: 0.9 }}>
-                        {pathSteps} step{pathSteps !== 1 ? 's' : ''}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                        Wait
-                      </div>
-                    )}
-                  </div>
+                    {action.name} ({action.cost} AP)
+                    {action.requiresItem && action.targetId && ' - Target Selected'}
+                  </button>
                 );
               })}
             </div>
+            
+            {/* Select Character Button */}
+            {!isSelected && (
+              <button
+                onClick={() => onCharacterClick(currentActiveCharacter)}
+                style={{
+                  width: '100%',
+                  marginTop: '0.5rem',
+                  padding: '0.5rem',
+                  fontSize: '0.85rem',
+                  backgroundColor: theme.colors.cardBackground,
+                  color: theme.colors.text,
+                  border: `1px solid ${theme.colors.imageBorder}`,
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Select Character
+              </button>
+            )}
           </div>
         );
       })()}
 
-      {/* Movement Planning Controls - Compact */}
-      {phase === 'movement' && (
-        <div style={{
-          marginBottom: '0.75rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem'
-        }}>
-            {movementPlan.hasAnyPath() && (() => {
-            // Force recalculation when paths change (use pathUpdateTrigger)
-            void pathUpdateTrigger;
-            
-            // Check if there are any paths that can be executed (ready, executing, or conflicting)
-            const allPaths = movementPlan.getAllPaths();
-            const executablePaths = allPaths.filter(path => 
-              path.steps.length > 0 && 
-              path.currentStepIndex < path.steps.length
-            );
-            
-            if (executablePaths.length === 0) return null;
-            
-            // Get validation state from parent if provided
-            const buttonState = validateAndGetExecuteButtonState ? validateAndGetExecuteButtonState() : { canExecute: true, invalidReasons: [] };
-            const hasInvalidNextStep = !buttonState.canExecute;
-            
-            return (
-              <button
-                onClick={onExecuteFreeMoves || (() => {})}
-                disabled={hasInvalidNextStep}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  fontSize: '0.85rem',
-                  backgroundColor: hasInvalidNextStep ? theme.colors.imageBackground : theme.colors.accent,
-                  color: theme.colors.text,
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: hasInvalidNextStep ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  opacity: hasInvalidNextStep ? 0.6 : 1
-                }}
-                title={hasInvalidNextStep ? `Cannot execute: ${buttonState.invalidReasons.join(', ')}` : 'Execute next step for all characters'}
-              >
-                Execute Free Moves{hasInvalidNextStep ? ' (Invalid)' : ''}
-              </button>
-            );
-          })()}
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {selectedCharacter && (() => {
-              const path = movementPlan.getPath(selectedCharacter);
-              // Only show undo if there are planned steps that haven't been executed yet
-              const unexecutedSteps = path && path.steps.length > path.currentStepIndex;
-              if (!unexecutedSteps) return null;
-              
-              return (
-                <button
-                  onClick={onUndoLastStep}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    fontSize: '0.85rem',
-                    backgroundColor: theme.colors.cardBackground,
-                    color: theme.colors.text,
-                    border: `1px solid ${theme.colors.imageBorder}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    minWidth: '120px'
-                  }}
-                >
-                  Undo Last Step
-                </button>
-              );
-            })()}
-            <button
-              onClick={onClearAllMovements}
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                fontSize: '0.85rem',
-                backgroundColor: theme.colors.cardBackground,
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.imageBorder}`,
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                minWidth: '120px'
-              }}
-            >
-              Clear All Movements
-            </button>
-            <button
-              onClick={onPlanSkills}
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                fontSize: '0.85rem',
-                backgroundColor: theme.colors.success,
-                color: theme.colors.text,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Plan Skills
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Skill Action Planning Phase */}
-      {phase === 'skill' && (
-        <>
-          {/* Action Queue - Compact */}
-          <div style={{
-            marginBottom: '0.75rem',
-            padding: '0.75rem',
-            backgroundColor: theme.colors.background,
-            borderRadius: '6px',
-            border: `1px solid ${theme.colors.imageBorder}`
-          }}>
-            <div style={{ 
-              marginBottom: '0.5rem', 
-              color: theme.colors.accent,
-              fontSize: '0.9rem',
-              fontWeight: 'bold'
-            }}>
-              Action Queue
-            </div>
-            {plannedActions.length === 0 ? (
-              <div style={{ fontSize: '0.75rem', opacity: 0.7, fontStyle: 'italic' }}>
-                No actions planned. Select characters to add actions.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {plannedActions.map((action, index) => {
-                  const charIndex = Array.from(world.getAllEntities()).indexOf(action.characterId);
-                  const charName = party[charIndex]?.name || `C${charIndex + 1}`;
-                  return (
-                    <div
-                      key={`${action.characterId}-${index}`}
-                      style={{
-                        padding: '0.5rem',
-                        backgroundColor: theme.colors.cardBackground,
-                        borderRadius: '4px',
-                        border: `1px solid ${theme.colors.imageBorder}`,
-                        fontSize: '0.75rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}
-                    >
-                      <div style={{ fontWeight: 'bold', minWidth: '1.5rem' }}>
-                        {index + 1}.
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        {charName}: {action.action} ({action.cost} stamina)
-                      </div>
-                      {onMoveActionUp && (
-                        <button
-                          onClick={() => {
-                            if (index > 0) {
-                              onMoveActionUp(index);
-                            }
-                          }}
-                          disabled={index === 0}
-                          style={{
-                            padding: '0.25rem 0.4rem',
-                            fontSize: '0.7rem',
-                            backgroundColor: index === 0 ? theme.colors.imageBackground : theme.colors.cardBackground,
-                            color: theme.colors.text,
-                            border: `1px solid ${theme.colors.imageBorder}`,
-                            borderRadius: '3px',
-                            cursor: index === 0 ? 'not-allowed' : 'pointer',
-                            opacity: index === 0 ? 0.5 : 1
-                          }}
-                        >
-                          ↑
-                        </button>
-                      )}
-                      {onMoveActionDown && (
-                        <button
-                          onClick={() => {
-                            if (index < plannedActions.length - 1) {
-                              onMoveActionDown(index);
-                            }
-                          }}
-                          disabled={index === plannedActions.length - 1}
-                          style={{
-                            padding: '0.25rem 0.4rem',
-                            fontSize: '0.7rem',
-                            backgroundColor: index === plannedActions.length - 1 ? theme.colors.imageBackground : theme.colors.cardBackground,
-                            color: theme.colors.text,
-                            border: `1px solid ${theme.colors.imageBorder}`,
-                            borderRadius: '3px',
-                            cursor: index === plannedActions.length - 1 ? 'not-allowed' : 'pointer',
-                            opacity: index === plannedActions.length - 1 ? 0.5 : 1
-                          }}
-                        >
-                          ↓
-                        </button>
-                      )}
-                      {onRemoveAction && (
-                        <button
-                          onClick={() => {
-                            onRemoveAction(index);
-                          }}
-                        style={{
-                          padding: '0.25rem 0.4rem',
-                          fontSize: '0.7rem',
-                          backgroundColor: '#d32f2f',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '3px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Available Actions - When character selected */}
-          {selectedCharacter && (() => {
-            const availableActions = getAvailableActions(selectedCharacter);
-            const charIndex = Array.from(world.getAllEntities()).indexOf(selectedCharacter);
-            const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
-            const existingActionIndex = plannedActions.findIndex(a => a.characterId === selectedCharacter);
-            
-            return (
-              <div style={{
-                marginBottom: '0.75rem',
-                padding: '0.75rem',
-                backgroundColor: theme.colors.background,
-                borderRadius: '6px',
-                border: `1px solid ${theme.colors.imageBorder}`
-              }}>
-                <div style={{ 
-                  marginBottom: '0.5rem', 
-                  color: theme.colors.accent,
-                  fontSize: '0.9rem',
-                  fontWeight: 'bold'
-                }}>
-                  {charName} - Select Action
-                </div>
-                <select
-                  value={existingActionIndex >= 0 ? plannedActions[existingActionIndex].action : 'Wait'}
-                  onChange={(e) => onActionSelect(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    fontSize: '0.85rem',
-                    backgroundColor: theme.colors.cardBackground,
-                    color: theme.colors.text,
-                    border: `1px solid ${theme.colors.imageBorder}`,
-                    borderRadius: '4px'
-                  }}
-                >
-                  <option value="Wait">Wait (0 stamina)</option>
-                  {availableActions.filter(a => a.name !== 'Wait').map((action, index) => (
-                    <option key={index} value={action.name}>
-                      {action.name} ({action.cost} stamina{action.requiresItem ? ', requires item' : ''})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          {/* Skill Action Controls - Compact */}
-          <div style={{
-            marginBottom: '0.75rem',
-            display: 'flex',
-            gap: '0.5rem'
-          }}>
-            <button
-              onClick={onBackToMovement}
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                fontSize: '0.85rem',
-                backgroundColor: theme.colors.cardBackground,
-                color: theme.colors.text,
-                border: `1px solid ${theme.colors.imageBorder}`,
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Back
-            </button>
-            <button
-              onClick={onExecuteActions}
-              style={{
-                flex: 1,
-                padding: '0.5rem',
-                fontSize: '0.85rem',
-                backgroundColor: theme.colors.success,
-                color: theme.colors.text,
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}
-            >
-              Execute
-            </button>
-          </div>
-        </>
-      )}
 
       {/* Selected Entity Stats - Only show one at a time */}
       {selectedCharacter && !selectedObject && (() => {

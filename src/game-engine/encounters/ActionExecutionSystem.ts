@@ -5,11 +5,15 @@ import { MovementSystem } from './MovementSystem';
 import { PushSystem } from './PushSystem';
 import { PlannedAction } from './EncounterStateManager';
 import { WinConditionSystem } from './WinConditionSystem';
+import { ActionPointSystem } from './ActionPointSystem';
+import { TurnSystem } from './TurnSystem';
+import { ACTION_COSTS } from './constants';
 
 export interface ActionExecutionResult {
   success: boolean;
-  action: PlannedAction;
+  action: PlannedAction | { characterId: number; action: string; targetId?: number; targetPos?: { x: number; y: number } };
   error?: string;
+  apRemaining?: number;
 }
 
 export interface ExecutionSummary {
@@ -18,11 +22,10 @@ export interface ExecutionSummary {
 }
 
 /**
- * ActionExecutionSystem executes planned actions (movement, push, wait)
+ * ActionExecutionSystem executes actions immediately with AP deduction
  * 
- * This system extracts action execution logic from the UI layer,
- * providing a clean API for executing planned actions and handling
- * validation and errors.
+ * This system provides immediate action execution (not batched) and handles
+ * AP deduction for each action. Actions execute immediately when called.
  */
 export class ActionExecutionSystem {
   private movementSystem: MovementSystem;
@@ -36,7 +39,249 @@ export class ActionExecutionSystem {
   }
 
   /**
-   * Execute all planned actions
+   * Execute a move action immediately
+   * Deducts 15 AP from the character
+   * 
+   * @param world - The ECS world
+   * @param grid - The grid
+   * @param characterId - The character ID
+   * @param targetPos - Target position {x, y}
+   * @param apSystem - ActionPointSystem to deduct AP
+   * @returns Execution result with success status and remaining AP
+   */
+  executeMoveAction(
+    world: World,
+    grid: Grid,
+    characterId: number,
+    targetPos: { x: number; y: number },
+    apSystem: ActionPointSystem
+  ): ActionExecutionResult {
+    // Check if character can afford the move
+    if (!apSystem.canAffordMove(characterId)) {
+      return {
+        success: false,
+        action: { characterId, action: 'Move', targetPos },
+        error: 'Insufficient AP to move',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Validate move (check if position is valid and reachable)
+    const charPos = world.getComponent<PositionComponent>(characterId, 'Position');
+    if (!charPos) {
+      return {
+        success: false,
+        action: { characterId, action: 'Move', targetPos },
+        error: 'Character has no position',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if target position is valid
+    if (!grid.isValid(targetPos.x, targetPos.y)) {
+      return {
+        success: false,
+        action: { characterId, action: 'Move', targetPos },
+        error: 'Invalid target position',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if target is a wall
+    if (grid.isWall(targetPos.x, targetPos.y)) {
+      return {
+        success: false,
+        action: { characterId, action: 'Move', targetPos },
+        error: 'Cannot move into wall',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if target is occupied
+    const entities = world.getAllEntities();
+    for (const entityId of entities) {
+      if (entityId === characterId) continue;
+      const pos = world.getComponent<PositionComponent>(entityId, 'Position');
+      if (pos && pos.x === targetPos.x && pos.y === targetPos.y) {
+        return {
+          success: false,
+          action: { characterId, action: 'Move', targetPos },
+          error: 'Target position is occupied',
+          apRemaining: apSystem.getAP(characterId),
+        };
+      }
+    }
+
+    // Execute move
+    const moveSuccess = this.movementSystem.moveCharacter(world, characterId, targetPos);
+    if (!moveSuccess) {
+      return {
+        success: false,
+        action: { characterId, action: 'Move', targetPos },
+        error: 'Failed to move character',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Deduct AP
+    const remainingAP = apSystem.deductAP(characterId, ACTION_COSTS.MOVE);
+
+    return {
+      success: true,
+      action: { characterId, action: 'Move', targetPos },
+      apRemaining: remainingAP,
+    };
+  }
+
+  /**
+   * Execute a push action immediately
+   * Deducts 25 AP from the character
+   * 
+   * @param world - The ECS world
+   * @param grid - The grid
+   * @param characterId - The character ID
+   * @param targetId - The object/entity to push
+   * @param apSystem - ActionPointSystem to deduct AP
+   * @returns Execution result with success status and remaining AP
+   */
+  executePushAction(
+    world: World,
+    grid: Grid,
+    characterId: number,
+    targetId: number,
+    apSystem: ActionPointSystem
+  ): ActionExecutionResult {
+    // Check if character can afford the push
+    if (!apSystem.canAffordPush(characterId)) {
+      return {
+        success: false,
+        action: { characterId, action: 'Push', targetId },
+        error: 'Insufficient AP to push',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Get valid push directions for this character and object
+    const pushActions = this.pushSystem.getValidPushActions(
+      world,
+      grid,
+      characterId,
+      targetId
+    );
+
+    if (pushActions.length === 0) {
+      return {
+        success: false,
+        action: { characterId, action: 'Push', targetId },
+        error: 'No valid push directions',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Find the direction that makes sense based on character position
+    // Character should be behind the object in the push direction
+    const charPos = world.getComponent<PositionComponent>(characterId, 'Position');
+    const objPos = world.getComponent<PositionComponent>(targetId, 'Position');
+
+    if (!charPos || !objPos) {
+      return {
+        success: false,
+        action: { characterId, action: 'Push', targetId },
+        error: 'Character or object has no position',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    let pushDirection = pushActions[0].direction; // Default to first
+
+    // Calculate direction from character to object
+    const charToObj = {
+      dx: objPos.x - charPos.x,
+      dy: objPos.y - charPos.y,
+    };
+
+    // Find push direction that matches (character behind object)
+    const matchingDirection = pushActions.find(pa =>
+      pa.direction.dx === charToObj.dx && pa.direction.dy === charToObj.dy
+    );
+
+    if (matchingDirection) {
+      pushDirection = matchingDirection.direction;
+    }
+
+    // Get object's current position BEFORE pushing (copy the values, not the reference)
+    const objPosComponent = world.getComponent<PositionComponent>(targetId, 'Position');
+    if (!objPosComponent) {
+      return {
+        success: false,
+        action: { characterId, action: 'Push', targetId },
+        error: 'Object has no position',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Copy the position values (before they get modified by pushObject)
+    const objOldPosition = { x: objPosComponent.x, y: objPosComponent.y };
+
+    // Push the object (this modifies objPosComponent)
+    this.pushSystem.pushObject(world, targetId, pushDirection);
+
+    // Move character to object's old position (using the copied values)
+    this.movementSystem.moveCharacter(world, characterId, objOldPosition);
+
+    // Deduct AP
+    const remainingAP = apSystem.deductAP(characterId, ACTION_COSTS.PUSH);
+
+    return {
+      success: true,
+      action: { characterId, action: 'Push', targetId },
+      apRemaining: remainingAP,
+    };
+  }
+
+  /**
+   * Execute a pass action
+   * Ends the character's turn and resets their AP to 50
+   * 
+   * @param characterId - The character ID
+   * @param turnSystem - TurnSystem to advance turn
+   * @param apSystem - ActionPointSystem to reset AP
+   * @returns Execution result with success status
+   */
+  executePassAction(
+    characterId: number,
+    turnSystem: TurnSystem,
+    apSystem: ActionPointSystem
+  ): ActionExecutionResult {
+    // Verify this is the current active character
+    const currentActive = turnSystem.getCurrentActiveCharacter();
+    if (currentActive !== characterId) {
+      return {
+        success: false,
+        action: { characterId, action: 'Pass' },
+        error: 'Not this character\'s turn',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Reset AP for this character (they'll get 50 AP at start of next turn)
+    apSystem.resetAP(characterId);
+
+    // Pass the turn (this will advance to next character or complete round)
+    const roundComplete = turnSystem.passTurn();
+
+    return {
+      success: true,
+      action: { characterId, action: 'Pass' },
+      apRemaining: 0, // AP is reset, but they'll have 50 at start of next turn
+    };
+  }
+
+  /**
+   * Execute all planned actions (batched execution)
+   * 
+   * @deprecated Use immediate execution methods (executeMoveAction, executePushAction) instead.
+   * This method is kept for backward compatibility during the transition.
    * 
    * @param world - The ECS world
    * @param grid - The grid
@@ -74,6 +319,8 @@ export class ActionExecutionSystem {
   /**
    * Execute a single planned action
    * 
+   * @deprecated Use immediate execution methods instead.
+   * 
    * @param world - The ECS world
    * @param grid - The grid
    * @param plannedAction - The action to execute
@@ -85,7 +332,9 @@ export class ActionExecutionSystem {
     plannedAction: PlannedAction
   ): ActionExecutionResult {
     if (plannedAction.action === 'Push' && plannedAction.targetId) {
-      return this.executePushAction(world, grid, plannedAction);
+      // For backward compatibility, execute push without AP system
+      // This will be removed once all code uses immediate execution
+      return this.executePushActionLegacy(world, grid, plannedAction);
     } else if (plannedAction.action === 'Wait') {
       return this.executeWaitAction(plannedAction);
     } else {
@@ -98,9 +347,10 @@ export class ActionExecutionSystem {
   }
 
   /**
-   * Execute a Push action
+   * Execute a Push action (legacy method without AP)
+   * @deprecated Use executePushAction with AP system instead
    */
-  private executePushAction(
+  private executePushActionLegacy(
     world: World,
     grid: Grid,
     plannedAction: PlannedAction
@@ -187,5 +437,20 @@ export class ActionExecutionSystem {
       action: plannedAction,
     };
   }
-}
 
+  /**
+   * Check win condition
+   * 
+   * @param world - The ECS world
+   * @param grid - The grid
+   * @param getPlayerCharacters - Function to get player character IDs
+   * @returns True if win condition is met
+   */
+  checkWinCondition(
+    world: World,
+    grid: Grid,
+    getPlayerCharacters: () => number[]
+  ): boolean {
+    return this.winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
+  }
+}

@@ -4,28 +4,28 @@ overview: Refactor the turn structure from a phase-based system (movement/skill/
 todos:
   - id: define-action-costs
     content: Define action cost constants (MOVE=15, PUSH=25, PASS=0) and integrate throughout codebase
-    status: pending
+    status: completed
     difficulty: 1
   - id: create-action-point-system
     content: Create ActionPointSystem.ts to track AP per character (default 50), deduct AP on actions, check affordability, reset AP at turn start
-    status: pending
+    status: completed
     difficulty: 2
     dependencies:
       - define-action-costs
   - id: refactor-turn-system
     content: Refactor TurnSystem.ts to track current active character, character turn order (by MOV), round management, and turn advancement (nextCharacter, passTurn, startRound)
-    status: pending
+    status: completed
     difficulty: 4
   - id: update-action-execution-ap
     content: Update ActionExecutionSystem.ts to deduct AP on action execution (move=15, push=25), support immediate execution, add executePassAction
-    status: pending
+    status: completed
     difficulty: 3
     dependencies:
       - create-action-point-system
       - define-action-costs
   - id: update-encounter-controller
     content: Update EncounterController.ts to remove phase management, integrate ActionPointSystem, add turn order management, add executeActionImmediate method
-    status: pending
+    status: completed
     difficulty: 5
     dependencies:
       - create-action-point-system
@@ -33,7 +33,7 @@ todos:
       - update-action-execution-ap
   - id: refactor-encounter-view-ui
     content: Refactor EncounterView.tsx to remove phase-based UI, add current character turn display, add AP display, show only affordable actions, execute actions immediately, add Pass button
-    status: pending
+    status: completed
     difficulty: 5
     dependencies:
       - update-encounter-controller
