@@ -82,7 +82,7 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
   getCharacterAP,
   onPass,
   selectingDirection = false,
-  onDirectionSelect,
+  onDirectionSelect: _onDirectionSelect,
 }) => {
   // CRITICAL CHECK: Verify new code is running
   if (typeof window !== 'undefined' && !(window as any).__ENCOUNTER_INFO_PANEL_V2__) {

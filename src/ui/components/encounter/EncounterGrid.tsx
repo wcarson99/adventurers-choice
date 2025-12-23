@@ -32,7 +32,7 @@ export const EncounterGrid: React.FC<EncounterGridProps> = ({
   movementPlan,
   showTileCoordinates,
   onTileClick,
-  selectingDirection = false,
+  selectingDirection: _selectingDirection = false,
 }) => {
   const tiles = Array.from({ length: grid.width * grid.height }, (_, i) => grid.getCoords(i));
 

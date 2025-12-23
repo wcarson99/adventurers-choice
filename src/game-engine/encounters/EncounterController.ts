@@ -315,10 +315,10 @@ export class EncounterController {
   /**
    * @deprecated Phase-based system removed. Use action point system instead.
    */
-  transitionToPhase(newPhase: PlanningPhase): boolean {
-    return this.phaseManager.transitionToPhase(newPhase, () => {
-      // No-op callback - phase updates are handled by React state in EncounterView
-    });
+  transitionToPhase(_newPhase: PlanningPhase): boolean {
+    // Deprecated method - phase system removed
+    // This method is kept for backward compatibility but does nothing
+    return false;
   }
 
   /**
@@ -382,8 +382,9 @@ export class EncounterController {
   /**
    * @deprecated Planned actions are no longer used. Actions execute immediately.
    */
-  setPlannedActions(actions: PlannedAction[]): void {
-    this.stateManager.setPlannedActions(actions);
+  setPlannedActions(_actions: PlannedAction[]): void {
+    // Deprecated method - planned actions removed
+    // This method is kept for backward compatibility but does nothing
   }
 
   /**
@@ -435,7 +436,7 @@ export class EncounterController {
    */
   resetForNewTurn(): void {
     this.phaseManager.resetToMovement();
-    this.stateManager.setPlannedActions([]);
+    // setPlannedActions removed - planned actions no longer used
     this.stateManager.setSelectedCharacter(null);
     this.stateManager.setSelectedObject(null);
     this.stateManager.setValidMoves([]);

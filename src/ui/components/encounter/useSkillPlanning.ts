@@ -3,7 +3,7 @@ import { World } from '../../../game-engine/ecs/World';
 import { Grid } from '../../../game-engine/grid/Grid';
 import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from '../../../game-engine/ecs/Component';
 import { PushSystem } from '../../../game-engine/encounters/PushSystem';
-import { PlannedAction } from '../../../game-engine/encounters/EncounterStateManager';
+// PlannedAction type no longer used in this hook
 import { theme } from '../../styles/theme';
 
 interface UseSkillPlanningProps {
@@ -22,7 +22,7 @@ export const useSkillPlanning = ({
   world,
   grid,
   selectedCharacter,
-  selectedObject,
+  selectedObject: _selectedObject,
   onCharacterSelect,
   onObjectSelect,
   onValidPushDirectionsUpdate,
