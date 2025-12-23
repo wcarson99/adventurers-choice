@@ -7,6 +7,7 @@ import { MovementSystem } from '../../game-engine/encounters/MovementSystem';
 import { PushSystem } from '../../game-engine/encounters/PushSystem';
 import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
 import { ConflictDetector } from '../../game-engine/encounters/ConflictDetector';
+import { TurnSystem } from '../../game-engine/encounters/TurnSystem';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -40,6 +41,16 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const isCompletingRef = useRef(false); // Prevent multiple completion calls (use ref to avoid dependency issues)
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
+  const turnSystemRef = useRef<TurnSystem>(new TurnSystem());
+  const [currentTurn, setCurrentTurn] = useState(1); // Track turn for React re-renders
+
+  // Reset turn system when encounter changes
+  React.useEffect(() => {
+    if (currentEncounterIndex !== undefined) {
+      turnSystemRef.current.reset();
+      setCurrentTurn(1); // Reset displayed turn to 1
+    }
+  }, [currentEncounterIndex]);
 
   // Initialize original positions at start of turn (when entering movement phase)
   React.useEffect(() => {
@@ -894,7 +905,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
             {getInstructions()}
           </div>
           <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>
-            Turn: 1
+            Turn: {currentTurn}
           </div>
         </div>
 
@@ -1654,6 +1665,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                     
                     // Reset after execution (only if win condition not met)
                     setTimeout(() => {
+                      // Increment turn - a complete cycle (movement + skill + execution) has finished
+                      turnSystemRef.current.incrementTurn();
+                      setCurrentTurn(turnSystemRef.current.getCurrentTurn() + 1); // Update displayed turn
                       setPlannedActions([]);
                       setPhase('movement');
                       setSelectedCharacter(null);

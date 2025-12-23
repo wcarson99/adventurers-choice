@@ -15,34 +15,127 @@ A cooperative party adventure game centered on collaborative, attribute-driven m
 
 ### Prerequisites
 
-- Node.js 18+
-- npm or yarn
+- **Node.js 18+** (check with `node --version`)
+- **npm** (comes with Node.js)
 
-### Setup
+### Setup (After Cloning)
 
-1. Install dependencies:
-
+**Option 1: Automated Setup (Recommended)**
 ```bash
-npm install
+npm run setup
 ```
 
-2. Start development server:
+This script will:
+- Check Node.js version
+- Install npm dependencies
+- Install Playwright browsers
+- Verify the build
 
+**Option 2: Manual Setup**
+
+1. **Install Node.js dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Install Playwright browsers** (required for E2E tests):
+   ```bash
+   npx playwright install chromium
+   ```
+
+3. **Verify setup:**
+   ```bash
+   npm run build
+   ```
+
+### Development Workflow
+
+**Start the development server:**
 ```bash
 npm run dev
 ```
 
-3. Run E2E tests:
+The app will be available at `http://localhost:5173`
 
+**Run E2E tests:**
 ```bash
 npm run test:e2e
 ```
 
-4. Run unit tests (if added):
+**Run E2E tests with UI (interactive):**
+```bash
+npm run test:e2e:ui
+```
 
+**Run E2E tests in headed mode (see browser):**
+```bash
+npm run test:e2e:headed
+```
+
+**Run unit tests:**
 ```bash
 npm run test:unit
 ```
+
+**Build for production:**
+```bash
+npm run build
+```
+
+**Preview production build:**
+```bash
+npm run preview
+```
+
+### Clean & Reset
+
+**Clean build artifacts** (keeps node_modules):
+```bash
+npm run clean
+```
+
+This removes:
+- `dist/` and `dist-ssr/` (build output)
+- `test-results/` and `playwright-report/` (test artifacts)
+- `*.log` files (log files)
+
+**Deep clean** (removes everything including node_modules):
+```bash
+npm run clean:all
+```
+
+**Full reset** (clean everything + reinstall):
+```bash
+npm run reset
+```
+
+This is equivalent to:
+```bash
+npm run clean:all
+npm install
+npm run setup
+```
+
+### CI/CD Setup
+
+For continuous integration (GitHub Actions, GitLab CI, etc.), add these steps:
+
+```yaml
+# Example GitHub Actions workflow
+- name: Install dependencies
+  run: npm ci
+
+- name: Install Playwright browsers
+  run: npx playwright install --with-deps chromium
+
+- name: Run tests
+  run: npm run test:e2e
+
+- name: Build
+  run: npm run build
+```
+
+**Note:** In CI environments, use `npx playwright install --with-deps` to install system dependencies (like libraries required by Chromium) automatically.
 
 ## Project Structure
 
