@@ -11,6 +11,7 @@ import { EncounterPhaseManager, PlanningPhase } from '../../game-engine/encounte
 import { EncounterStateManager, PlannedAction, ValidMove, ValidPushDirection } from '../../game-engine/encounters/EncounterStateManager';
 import { ActionExecutionSystem } from '../../game-engine/encounters/ActionExecutionSystem';
 import { EncounterGrid } from './encounter/EncounterGrid';
+import { EncounterInfoPanel } from './encounter/EncounterInfoPanel';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -636,6 +637,410 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     }
   };
 
+  // Callback functions for EncounterInfoPanel
+  const handleExecuteFreeMoves = () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1045',message:'Execute Free Moves button clicked',data:{executablePathsCount:movementPlan.getAllPaths().filter(p => p.steps.length > 0 && p.currentStepIndex < p.steps.length).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    
+    const allPaths = movementPlan.getAllPaths();
+    const executablePaths = allPaths.filter(path => 
+      path.steps.length > 0 && 
+      path.currentStepIndex < path.steps.length
+    );
+    
+    // Execute next step for all characters with executable paths
+    let allInExitDuringMovement = false;
+    executablePaths.forEach(path => {
+      const nextStep = path.steps[path.currentStepIndex];
+      if (nextStep) {
+        // Move character to next step
+        movementSystem.moveCharacter(world, path.characterId, nextStep);
+        path.currentStepIndex++;
+        
+        // Update original position to new position (executed step becomes current position)
+        originalPositions.set(path.characterId, { x: nextStep.x, y: nextStep.y });
+        
+        // Update status
+        if (path.currentStepIndex >= path.steps.length) {
+          path.status = 'complete';
+        } else {
+          path.status = 'executing';
+        }
+        
+        // Check win condition after each character moves
+        const allInExitNow = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
+        if (allInExitNow) {
+          allInExitDuringMovement = true;
+        }
+      }
+    });
+    
+    // If win condition met during movement, handle it immediately
+    if (allInExitDuringMovement) {
+      // Show status message
+      if (activeCampaign && currentEncounterIndex !== undefined) {
+        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
+        if (isLastEncounter) {
+          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
+        } else {
+          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
+        }
+      } else {
+        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
+        if (activeMission?.days) consumeFood(activeMission.days * 4);
+      }
+      completeMission();
+      return; // Don't continue with normal flow
+    }
+    
+    // After execution, re-validate next steps for all characters
+    const remainingPaths = movementPlan.getAllPaths().filter(p => 
+      p.steps.length > 0 && p.currentStepIndex < p.steps.length
+    );
+    
+    remainingPaths.forEach(path => {
+      const nextStep = path.steps[path.currentStepIndex];
+      if (!nextStep) return;
+      
+      const currentPos = world.getComponent<PositionComponent>(path.characterId, 'Position');
+      if (!currentPos) return;
+      
+      const attrs = world.getComponent<AttributesComponent>(path.characterId, 'Attributes');
+      if (!attrs) return;
+      
+      // Validate next step
+      const isValidMove = movementSystem.canMoveFromTo(
+        world,
+        grid,
+        path.characterId,
+        { x: currentPos.x, y: currentPos.y },
+        nextStep,
+        attrs.mov
+      );
+      
+      if (!isValidMove) {
+        movementPlan.setPathStatus(path.characterId, 'blocked');
+        return;
+      }
+      
+      // Check for conflicts with other characters' next steps
+      const allPathsAfterExecution = movementPlan.getAllPaths();
+      const otherExecutablePaths = allPathsAfterExecution.filter(p => 
+        p.characterId !== path.characterId &&
+        p.steps.length > 0 && 
+        p.currentStepIndex < p.steps.length
+      );
+      
+      const conflictingPath = otherExecutablePaths.find(otherPath => {
+        const otherNextStep = otherPath.steps[otherPath.currentStepIndex];
+        return otherNextStep.x === nextStep.x && otherNextStep.y === nextStep.y;
+      });
+      
+      if (conflictingPath) {
+        movementPlan.setPathStatus(path.characterId, 'conflicting');
+      } else {
+        movementPlan.setPathStatus(path.characterId, 'ready');
+      }
+    });
+    
+    // Check for win condition after executing movement
+    const allInExitAfterMovement = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
+    
+    if (allInExitAfterMovement) {
+      // Show status message
+      if (activeCampaign && currentEncounterIndex !== undefined) {
+        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
+        if (isLastEncounter) {
+          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
+        } else {
+          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
+        }
+      } else {
+        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
+        if (activeMission?.days) consumeFood(activeMission.days * 4);
+      }
+      completeMission();
+      return; // Don't continue with normal flow
+    }
+    
+    setTick(t => t + 1); // Trigger re-render
+    setPathUpdateTrigger(t => t + 1); // Update button state
+  };
+
+  const validateAndGetExecuteButtonState = (): { canExecute: boolean; invalidReasons: string[] } => {
+    const allPaths = movementPlan.getAllPaths();
+    const executablePaths = allPaths.filter(path => 
+      path.steps.length > 0 && 
+      path.currentStepIndex < path.steps.length
+    );
+    
+    if (executablePaths.length === 0) {
+      return { canExecute: false, invalidReasons: ['No executable paths'] };
+    }
+    
+    let hasInvalidNextStep = false;
+    const invalidReasons: string[] = [];
+    
+    executablePaths.forEach(path => {
+      const nextStep = path.steps[path.currentStepIndex];
+      if (!nextStep) return;
+      
+      // Get character's current position (where they are now)
+      const currentPos = world.getComponent<PositionComponent>(path.characterId, 'Position');
+      if (!currentPos) return;
+      
+      const attrs = world.getComponent<AttributesComponent>(path.characterId, 'Attributes');
+      if (!attrs) return;
+      
+      // Check if next step is valid (movement pattern)
+      const isValidMove = movementSystem.canMoveFromTo(
+        world,
+        grid,
+        path.characterId,
+        { x: currentPos.x, y: currentPos.y },
+        nextStep,
+        attrs.mov
+      );
+      
+      if (!isValidMove) {
+        hasInvalidNextStep = true;
+        invalidReasons.push('Invalid movement pattern');
+        return;
+      }
+      
+      // Check for conflicts with other characters' next steps
+      const conflictingPath = executablePaths.find(otherPath => {
+        if (otherPath.characterId === path.characterId) return false; // Skip self
+        if (otherPath.currentStepIndex >= otherPath.steps.length) return false; // No next step
+        const otherNextStep = otherPath.steps[otherPath.currentStepIndex];
+        return otherNextStep.x === nextStep.x && otherNextStep.y === nextStep.y;
+      });
+      
+      if (conflictingPath) {
+        hasInvalidNextStep = true;
+        invalidReasons.push('Square will be occupied');
+        movementPlan.setPathStatus(path.characterId, 'conflicting');
+      } else {
+        // Clear conflicting status if step is now valid
+        if (path.status === 'conflicting') {
+          movementPlan.setPathStatus(path.characterId, 'ready');
+        }
+      }
+    });
+    
+    return { canExecute: !hasInvalidNextStep, invalidReasons };
+  };
+
+  const handleUndoLastStep = () => {
+    if (!selectedCharacter) return;
+    
+    // Remove last step from selected character's path (only unexecuted steps)
+    if (movementPlan.removeLastStep(selectedCharacter)) {
+      // Update valid moves from the new last position (or current position)
+      const updatedPath = movementPlan.getPath(selectedCharacter);
+      const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
+      if (attrs) {
+        let fromPos: { x: number; y: number };
+        if (updatedPath && updatedPath.steps.length > 0) {
+          fromPos = updatedPath.steps[updatedPath.steps.length - 1];
+        } else {
+          const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+          if (currentPos) {
+            fromPos = { x: currentPos.x, y: currentPos.y };
+          } else {
+            return;
+          }
+        }
+        const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, fromPos, attrs.mov);
+        updateValidMoves(moves);
+      }
+      setPathUpdateTrigger(t => t + 1);
+      setTick(t => t + 1);
+    }
+  };
+
+  const handleClearAllMovements = () => {
+    // Clear all paths
+    movementPlan.clearAll();
+    // Restore all characters to original positions
+    originalPositions.forEach((originalPos, charId) => {
+      movementSystem.moveCharacter(world, charId, originalPos);
+    });
+    updateSelectedCharacter(null);
+    updateValidMoves([]);
+    setTick(t => t + 1); // Trigger re-render
+  };
+
+  const handlePlanSkills = () => {
+    // Check if all paths are complete or no paths planned
+    const allComplete = movementPlan.getAllPaths().every(path => 
+      path.status === 'complete' || path.steps.length === 0
+    );
+    
+    if (allComplete || !movementPlan.hasAnyPath()) {
+      // Transition to skill phase
+      phaseManagerRef.current.transitionToSkill();
+      setPhase(phaseManagerRef.current.getCurrentPhase());
+      updateSelectedCharacter(null);
+      updateValidMoves([]);
+    } else {
+      showStatus('Complete all movement paths before proceeding', 'error');
+    }
+  };
+
+  const handleMoveActionUp = (index: number) => {
+    if (index > 0) {
+      const newActions = [...plannedActions];
+      [newActions[index - 1], newActions[index]] = [newActions[index], newActions[index - 1]];
+      updatePlannedActions(newActions);
+    }
+  };
+
+  const handleMoveActionDown = (index: number) => {
+    if (index < plannedActions.length - 1) {
+      const newActions = [...plannedActions];
+      [newActions[index], newActions[index + 1]] = [newActions[index + 1], newActions[index]];
+      updatePlannedActions(newActions);
+    }
+  };
+
+  const handleRemoveAction = (index: number) => {
+    const newActions = plannedActions.filter((_, i) => i !== index);
+    updatePlannedActions(newActions);
+  };
+
+  const handleActionSelect = (selectedActionName: string) => {
+    if (!selectedCharacter) return;
+    
+    const existingActionIndex = plannedActions.findIndex(a => a.characterId === selectedCharacter);
+    const availableActions = getAvailableActions(selectedCharacter);
+    
+    if (selectedActionName === 'Wait' || selectedActionName === '') {
+      // Remove action (set to Wait)
+      if (existingActionIndex >= 0) {
+        const newActions = plannedActions.filter((_, i) => i !== existingActionIndex);
+        updatePlannedActions(newActions);
+      }
+    } else {
+      // Find the action by name
+      const action = availableActions.find(a => a.name === selectedActionName);
+      if (action) {
+        const newAction: PlannedAction = {
+          characterId: selectedCharacter,
+          action: action.name,
+          cost: action.cost,
+          targetId: action.targetId || (action.requiresItem ? selectedObject || undefined : undefined)
+        };
+        
+        if (existingActionIndex >= 0) {
+          // Update existing action
+          const newActions = [...plannedActions];
+          newActions[existingActionIndex] = newAction;
+          updatePlannedActions(newActions);
+        } else {
+          // Add new action
+          updatePlannedActions([...plannedActions, newAction]);
+        }
+      }
+    }
+  };
+
+  const handleBackToMovement = () => {
+    // Restore original positions when going back
+    originalPositions.forEach((originalPos, charId) => {
+      movementSystem.moveCharacter(world, charId, originalPos);
+    });
+    updatePlannedActions([]);
+    phaseManagerRef.current.resetToMovement();
+    setPhase(phaseManagerRef.current.getCurrentPhase());
+    updateSelectedCharacter(null);
+    updateSelectedObject(null);
+    setTick(t => t + 1); // Trigger re-render
+  };
+
+  const handleExecuteActions = () => {
+    // Execute all planned actions (or everyone waits if no actions planned)
+    phaseManagerRef.current.transitionToExecuting();
+    setPhase(phaseManagerRef.current.getCurrentPhase());
+    
+    // Execute actions using ActionExecutionSystem
+    const executionSummary = actionExecutionSystemRef.current.executeActions(
+      world,
+      grid,
+      plannedActions,
+      getPlayerCharacters
+    );
+    
+    // Handle execution results
+    executionSummary.results.forEach((result) => {
+      if (!result.success) {
+        showStatus(result.error || 'Action execution failed', 'error');
+      } else if (result.action.action === 'Push') {
+        showStatus('Pushed crate!', 'success');
+        // Trigger re-render to show the movement
+        setTick(t => t + 1);
+      }
+    });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1553',message:'After skill phase execution - checking win condition',data:{phase:'skill_execution'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    // Check win condition immediately after executing actions
+    const allInExitAfterActions = executionSummary.winConditionMet;
+    // #region agent log
+    const allCharactersAfterActions = getPlayerCharacters();
+    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1560',message:'Win condition result after skill phase',data:{allInExit:allInExitAfterActions,characterCount:allCharactersAfterActions.length,characterPositions:allCharactersAfterActions.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    // Check win condition immediately after executing actions
+    if (allInExitAfterActions) {
+      console.log('✅ Win condition met after skill execution - calling completeMission()');
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1700',message:'Win condition met - calling completeMission from skill phase',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      // Show status message
+      if (activeCampaign && currentEncounterIndex !== undefined) {
+        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
+        if (isLastEncounter) {
+          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
+        } else {
+          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
+        }
+      } else {
+        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
+        if (activeMission?.days) consumeFood(activeMission.days * 4);
+      }
+      // Call completeMission directly - no setTimeout delay needed
+      completeMission();
+      return; // Don't reset to movement phase
+    }
+    
+    // Reset after execution (only if win condition not met)
+    setTimeout(() => {
+      // Increment turn - a complete cycle (movement + skill + execution) has finished
+      turnSystemRef.current.incrementTurn();
+      setCurrentTurn(turnSystemRef.current.getCurrentTurn() + 1); // Update displayed turn
+      updatePlannedActions([]);
+      phaseManagerRef.current.resetToMovement();
+      setPhase(phaseManagerRef.current.getCurrentPhase());
+      updateSelectedCharacter(null);
+      updateSelectedObject(null);
+      // Update original positions for next turn
+      const newOriginalPositions = new Map<number, { x: number; y: number }>();
+      const playerCharacters = getPlayerCharacters();
+      playerCharacters.forEach(charId => {
+        const pos = world.getComponent<PositionComponent>(charId, 'Position');
+        if (pos) {
+          newOriginalPositions.set(charId, { x: pos.x, y: pos.y });
+        }
+      });
+      setOriginalPositions(newOriginalPositions);
+      setTick(t => t + 1);
+    }, 500); // Give time for animations/visual feedback
+  };
+
   return (
     <div style={{ 
       display: 'flex', 
@@ -658,885 +1063,35 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       />
 
       {/* Info Panel - Right Side: 480px × 800px */}
-      <div style={{
-        width: '480px',
-        height: '800px',
-        backgroundColor: theme.colors.cardBackground,
-        borderLeft: `2px solid ${theme.colors.imageBorder}`,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '1rem',
-        overflowY: 'auto',
-        boxShadow: '-4px 0 6px rgba(0,0,0,0.3)'
-      }}>
-        {/* Mission/Campaign Title - Compact */}
-        {(activeMission || (activeCampaign && currentEncounterIndex !== undefined)) && (
-          <div style={{
-            marginBottom: '0.75rem',
-            paddingBottom: '0.75rem',
-            borderBottom: `1px solid ${theme.colors.imageBorder}`
-          }}>
-            <h2 style={{ 
-              fontSize: '1.2rem', 
-              margin: '0 0 0.25rem 0', 
-              color: theme.colors.accent,
-              fontWeight: 'bold'
-            }}>
-              {activeMission 
-                ? activeMission.title 
-                : activeCampaign && currentEncounterIndex !== undefined
-                  ? `${activeCampaign.name} - ${activeCampaign.encounters[currentEncounterIndex].name}`
-                  : ''}
-            </h2>
-            <p style={{ 
-              fontSize: '0.75rem', 
-              margin: 0, 
-              color: theme.colors.text,
-              opacity: 0.8,
-              lineHeight: '1.2'
-            }}>
-              {activeMission 
-                ? activeMission.description 
-                : activeCampaign && currentEncounterIndex !== undefined
-                  ? activeCampaign.encounters[currentEncounterIndex].description
-                  : ''}
-            </p>
-            {activeCampaign && currentEncounterIndex !== undefined && (
-              <p style={{ 
-                fontSize: '0.7rem', 
-                margin: '0.25rem 0 0 0', 
-                color: theme.colors.accentLight,
-                opacity: 0.7,
-                fontStyle: 'italic'
-              }}>
-                Encounter {currentEncounterIndex + 1} of {activeCampaign.encounters.length}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Instructions and Turn Counter - Compact */}
-        <div style={{
-          marginBottom: '0.75rem',
-          padding: '0.5rem',
-          backgroundColor: theme.colors.background,
-          borderRadius: '6px',
-          color: theme.colors.text,
-          fontSize: '0.85rem',
-          lineHeight: '1.3'
-        }}>
-          <div style={{ marginBottom: '0.25rem', fontWeight: 'bold' }}>
-            {getInstructions()}
-          </div>
-          <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>
-            Turn: {currentTurn}
-          </div>
-        </div>
-
-        {/* Free Actions - Movement Planning Phase - Compact */}
-        {phase === 'movement' && (() => {
-          const playerCharacters = getPlayerCharacters();
-          
-          return (
-            <div style={{
-              marginBottom: '0.75rem',
-              padding: '0.75rem',
-              backgroundColor: theme.colors.background,
-              borderRadius: '6px',
-              border: `1px solid ${theme.colors.imageBorder}`
-            }}>
-              <div style={{ 
-                marginBottom: '0.5rem', 
-                color: theme.colors.accent,
-                fontSize: '0.9rem',
-                fontWeight: 'bold'
-              }}>
-                Free Actions
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-                {playerCharacters.map(charId => {
-                  const charIndex = Array.from(world.getAllEntities()).indexOf(charId);
-                  const charName = party[charIndex]?.name || `C${charIndex + 1}`;
-                  const path = movementPlan.getPath(charId);
-                  const pathSteps = path ? path.steps.length : 0;
-                  const isSelected = selectedCharacter === charId;
-                  
-                  return (
-                    <div
-                      key={charId}
-                      style={{
-                        padding: '0.5rem',
-                        backgroundColor: isSelected 
-                          ? theme.colors.accent 
-                          : theme.colors.cardBackground,
-                        borderRadius: '4px',
-                        border: isSelected 
-                          ? `2px solid ${theme.colors.accentLight}` 
-                          : `1px solid ${theme.colors.imageBorder}`,
-                        fontSize: '0.75rem',
-                        color: isSelected ? theme.colors.background : theme.colors.text,
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => handleCharacterClick(charId)}
-                      title={pathSteps > 0 ? `${pathSteps} step${pathSteps !== 1 ? 's' : ''} planned` : 'No path planned'}
-                    >
-                      <div style={{ fontWeight: 'bold', marginBottom: '0.15rem', fontSize: '0.8rem' }}>
-                        {charName}
-                      </div>
-                      {pathSteps > 0 ? (
-                        <div style={{ fontSize: '0.7rem', opacity: 0.9 }}>
-                          {pathSteps} step{pathSteps !== 1 ? 's' : ''}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                          Wait
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Movement Planning Controls - Compact */}
-        {phase === 'movement' && (
-          <div style={{
-            marginBottom: '0.75rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem'
-          }}>
-            {movementPlan.hasAnyPath() && (() => {
-              // Force recalculation when paths change (use pathUpdateTrigger)
-              void pathUpdateTrigger;
-              
-              // Check if there are any paths that can be executed (ready, executing, or conflicting)
-              const allPaths = movementPlan.getAllPaths();
-              const executablePaths = allPaths.filter(path => 
-                path.steps.length > 0 && 
-                path.currentStepIndex < path.steps.length
-              );
-              
-              if (executablePaths.length === 0) return null;
-              
-              // Validate next step for all characters
-              let hasInvalidNextStep = false;
-              const invalidReasons: string[] = [];
-              
-              executablePaths.forEach(path => {
-                const nextStep = path.steps[path.currentStepIndex];
-                if (!nextStep) return;
-                
-                // Get character's current position (where they are now)
-                const currentPos = world.getComponent<PositionComponent>(path.characterId, 'Position');
-                if (!currentPos) return;
-                
-                const attrs = world.getComponent<AttributesComponent>(path.characterId, 'Attributes');
-                if (!attrs) return;
-                
-                // Check if next step is valid (movement pattern)
-                const isValidMove = movementSystem.canMoveFromTo(
-                  world,
-                  grid,
-                  path.characterId,
-                  { x: currentPos.x, y: currentPos.y },
-                  nextStep,
-                  attrs.mov
-                );
-                
-                if (!isValidMove) {
-                  hasInvalidNextStep = true;
-                  invalidReasons.push('Invalid movement pattern');
-                  return;
-                }
-                
-                // Check for conflicts with other characters' next steps
-                // Check if any other character's next step is the same position
-                const conflictingPath = executablePaths.find(otherPath => {
-                  if (otherPath.characterId === path.characterId) return false; // Skip self
-                  if (otherPath.currentStepIndex >= otherPath.steps.length) return false; // No next step
-                  const otherNextStep = otherPath.steps[otherPath.currentStepIndex];
-                  return otherNextStep.x === nextStep.x && otherNextStep.y === nextStep.y;
-                });
-                
-                if (conflictingPath) {
-                  hasInvalidNextStep = true;
-                  invalidReasons.push('Square will be occupied');
-                  movementPlan.setPathStatus(path.characterId, 'conflicting');
-                } else {
-                  // Clear conflicting status if step is now valid
-                  if (path.status === 'conflicting') {
-                    movementPlan.setPathStatus(path.characterId, 'ready');
-                  }
-                }
-              });
-              
-              return (
-                <button
-                  onClick={() => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1045',message:'Execute Free Moves button clicked',data:{executablePathsCount:executablePaths.length,paths:executablePaths.map(p=>({charId:p.characterId,currentStep:p.currentStepIndex,totalSteps:p.steps.length,nextStep:p.steps[p.currentStepIndex]}))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-                    // #endregion
-                    // Execute next step for all characters with executable paths
-                    let allInExitDuringMovement = false;
-                    executablePaths.forEach(path => {
-                      const nextStep = path.steps[path.currentStepIndex];
-                      if (nextStep) {
-                        // Move character to next step
-                        movementSystem.moveCharacter(world, path.characterId, nextStep);
-                        path.currentStepIndex++;
-                        
-                        // Update original position to new position (executed step becomes current position)
-                        originalPositions.set(path.characterId, { x: nextStep.x, y: nextStep.y });
-                        
-                        // Update status
-                        if (path.currentStepIndex >= path.steps.length) {
-                          path.status = 'complete';
-                        } else {
-                          path.status = 'executing';
-                        }
-                        
-                        // Check win condition after each character moves
-                        const allInExitNow = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
-                        if (allInExitNow) {
-                          allInExitDuringMovement = true;
-                        }
-                      }
-                    });
-                    
-                    // If win condition met during movement, handle it immediately
-                    if (allInExitDuringMovement) {
-                      // Show status message
-                      if (activeCampaign && currentEncounterIndex !== undefined) {
-                        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
-                        if (isLastEncounter) {
-                          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
-                        } else {
-                          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
-                        }
-                      } else {
-                        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-                        if (activeMission?.days) consumeFood(activeMission.days * 4);
-                      }
-                      completeMission();
-                      return; // Don't continue with normal flow
-                    }
-                    
-                    // After execution, re-validate next steps for all characters
-                    const remainingPaths = movementPlan.getAllPaths().filter(p => 
-                      p.steps.length > 0 && p.currentStepIndex < p.steps.length
-                    );
-                    
-                    remainingPaths.forEach(path => {
-                      const nextStep = path.steps[path.currentStepIndex];
-                      if (!nextStep) return;
-                      
-                      const currentPos = world.getComponent<PositionComponent>(path.characterId, 'Position');
-                      if (!currentPos) return;
-                      
-                      const attrs = world.getComponent<AttributesComponent>(path.characterId, 'Attributes');
-                      if (!attrs) return;
-                      
-                      // Validate next step
-                      const isValidMove = movementSystem.canMoveFromTo(
-                        world,
-                        grid,
-                        path.characterId,
-                        { x: currentPos.x, y: currentPos.y },
-                        nextStep,
-                        attrs.mov
-                      );
-                      
-                      if (!isValidMove) {
-                        movementPlan.setPathStatus(path.characterId, 'blocked');
-                        return;
-                      }
-                      
-                      // Check for conflicts with other characters' next steps
-                      const allPathsAfterExecution = movementPlan.getAllPaths();
-                      const otherExecutablePaths = allPathsAfterExecution.filter(p => 
-                        p.characterId !== path.characterId &&
-                        p.steps.length > 0 && 
-                        p.currentStepIndex < p.steps.length
-                      );
-                      
-                      const conflictingPath = otherExecutablePaths.find(otherPath => {
-                        const otherNextStep = otherPath.steps[otherPath.currentStepIndex];
-                        return otherNextStep.x === nextStep.x && otherNextStep.y === nextStep.y;
-                      });
-                      
-                      if (conflictingPath) {
-                        movementPlan.setPathStatus(path.characterId, 'conflicting');
-                      } else {
-                        movementPlan.setPathStatus(path.characterId, 'ready');
-                      }
-                    });
-                    
-                    // Check for win condition after executing movement
-                    const allInExitAfterMovement = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
-                    
-                    if (allInExitAfterMovement) {
-                      // Show status message
-                      if (activeCampaign && currentEncounterIndex !== undefined) {
-                        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
-                        if (isLastEncounter) {
-                          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
-                        } else {
-                          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
-                        }
-                      } else {
-                        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-                        if (activeMission?.days) consumeFood(activeMission.days * 4);
-                      }
-                      completeMission();
-                      return; // Don't continue with normal flow
-                    }
-                    
-                    setTick(t => t + 1); // Trigger re-render
-                    setPathUpdateTrigger(t => t + 1); // Update button state
-                  }}
-                  disabled={hasInvalidNextStep}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    fontSize: '0.85rem',
-                    backgroundColor: hasInvalidNextStep ? theme.colors.imageBackground : theme.colors.accent,
-                    color: theme.colors.text,
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: hasInvalidNextStep ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold',
-                    opacity: hasInvalidNextStep ? 0.6 : 1
-                  }}
-                  title={hasInvalidNextStep ? `Cannot execute: ${invalidReasons.join(', ')}` : 'Execute next step for all characters'}
-                >
-                  Execute Free Moves{hasInvalidNextStep ? ' (Invalid)' : ''}
-                </button>
-              );
-            })()}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {selectedCharacter && (() => {
-                const path = movementPlan.getPath(selectedCharacter);
-                // Only show undo if there are planned steps that haven't been executed yet
-                const unexecutedSteps = path && path.steps.length > path.currentStepIndex;
-                if (!unexecutedSteps) return null;
-                
-                return (
-                  <button
-                    onClick={() => {
-                      // Remove last step from selected character's path (only unexecuted steps)
-                      if (movementPlan.removeLastStep(selectedCharacter)) {
-                        // Update valid moves from the new last position (or current position)
-                        const updatedPath = movementPlan.getPath(selectedCharacter);
-                        const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
-                        if (attrs) {
-                          let fromPos: { x: number; y: number };
-                          if (updatedPath && updatedPath.steps.length > 0) {
-                            fromPos = updatedPath.steps[updatedPath.steps.length - 1];
-                          } else {
-                            const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
-                            if (currentPos) {
-                              fromPos = { x: currentPos.x, y: currentPos.y };
-                            } else {
-                              return;
-                            }
-                          }
-                          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, fromPos, attrs.mov);
-                          setValidMoves(moves);
-                        }
-                        setPathUpdateTrigger(t => t + 1);
-                        setTick(t => t + 1);
-                      }
-                    }}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    fontSize: '0.85rem',
-                    backgroundColor: theme.colors.cardBackground,
-                    color: theme.colors.text,
-                    border: `1px solid ${theme.colors.imageBorder}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    minWidth: '120px'
-                  }}
-                >
-                    Undo Last Step
-                  </button>
-                );
-              })()}
-              <button
-                onClick={() => {
-                  // Clear all paths
-                  movementPlan.clearAll();
-                  // Restore all characters to original positions
-                  originalPositions.forEach((originalPos, charId) => {
-                    movementSystem.moveCharacter(world, charId, originalPos);
-                  });
-                  setSelectedCharacter(null);
-                  setValidMoves([]);
-                  setTick(t => t + 1); // Trigger re-render
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  fontSize: '0.85rem',
-                  backgroundColor: theme.colors.cardBackground,
-                  color: theme.colors.text,
-                  border: `1px solid ${theme.colors.imageBorder}`,
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  minWidth: '120px'
-                }}
-              >
-                Clear All Movements
-              </button>
-              <button
-                onClick={() => {
-                  // Check if all paths are complete or no paths planned
-                  const allComplete = movementPlan.getAllPaths().every(path => 
-                    path.status === 'complete' || path.steps.length === 0
-                  );
-                  
-                  if (allComplete || !movementPlan.hasAnyPath()) {
-                    // Transition to skill phase
-                    phaseManagerRef.current.transitionToSkill();
-                    setPhase(phaseManagerRef.current.getCurrentPhase());
-                    setSelectedCharacter(null);
-                    setValidMoves([]);
-                  } else {
-                    showStatus('Complete all movement paths before proceeding', 'error');
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem',
-                  fontSize: '0.85rem',
-                  backgroundColor: theme.colors.success,
-                  color: theme.colors.text,
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                Plan Skills
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Skill Action Planning Phase */}
-        {phase === 'skill' && (() => {
-          // Removed unused playerCharacters variable
-          
-          return (
-            <>
-              {/* Action Queue - Compact */}
-              <div style={{
-                marginBottom: '0.75rem',
-                padding: '0.75rem',
-                backgroundColor: theme.colors.background,
-                borderRadius: '6px',
-                border: `1px solid ${theme.colors.imageBorder}`
-              }}>
-                <div style={{ 
-                  marginBottom: '0.5rem', 
-                  color: theme.colors.accent,
-                  fontSize: '0.9rem',
-                  fontWeight: 'bold'
-                }}>
-                  Action Queue
-                </div>
-                {plannedActions.length === 0 ? (
-                  <div style={{ fontSize: '0.75rem', opacity: 0.7, fontStyle: 'italic' }}>
-                    No actions planned. Select characters to add actions.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    {plannedActions.map((action, index) => {
-                      const charIndex = Array.from(world.getAllEntities()).indexOf(action.characterId);
-                      const charName = party[charIndex]?.name || `C${charIndex + 1}`;
-                      return (
-                        <div
-                          key={`${action.characterId}-${index}`}
-                          style={{
-                            padding: '0.5rem',
-                            backgroundColor: theme.colors.cardBackground,
-                            borderRadius: '4px',
-                            border: `1px solid ${theme.colors.imageBorder}`,
-                            fontSize: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                          }}
-                        >
-                          <div style={{ fontWeight: 'bold', minWidth: '1.5rem' }}>
-                            {index + 1}.
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            {charName}: {action.action} ({action.cost} stamina)
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (index > 0) {
-                                const newActions = [...plannedActions];
-                                [newActions[index - 1], newActions[index]] = [newActions[index], newActions[index - 1]];
-                                setPlannedActions(newActions);
-                              }
-                            }}
-                            disabled={index === 0}
-                            style={{
-                              padding: '0.25rem 0.4rem',
-                              fontSize: '0.7rem',
-                              backgroundColor: index === 0 ? theme.colors.imageBackground : theme.colors.cardBackground,
-                              color: theme.colors.text,
-                              border: `1px solid ${theme.colors.imageBorder}`,
-                              borderRadius: '3px',
-                              cursor: index === 0 ? 'not-allowed' : 'pointer',
-                              opacity: index === 0 ? 0.5 : 1
-                            }}
-                          >
-                            ↑
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (index < plannedActions.length - 1) {
-                                const newActions = [...plannedActions];
-                                [newActions[index], newActions[index + 1]] = [newActions[index + 1], newActions[index]];
-                                setPlannedActions(newActions);
-                              }
-                            }}
-                            disabled={index === plannedActions.length - 1}
-                            style={{
-                              padding: '0.25rem 0.4rem',
-                              fontSize: '0.7rem',
-                              backgroundColor: index === plannedActions.length - 1 ? theme.colors.imageBackground : theme.colors.cardBackground,
-                              color: theme.colors.text,
-                              border: `1px solid ${theme.colors.imageBorder}`,
-                              borderRadius: '3px',
-                              cursor: index === plannedActions.length - 1 ? 'not-allowed' : 'pointer',
-                              opacity: index === plannedActions.length - 1 ? 0.5 : 1
-                            }}
-                          >
-                            ↓
-                          </button>
-                          <button
-                            onClick={() => {
-                              const newActions = plannedActions.filter((_, i) => i !== index);
-                              setPlannedActions(newActions);
-                            }}
-                            style={{
-                              padding: '0.25rem 0.4rem',
-                              fontSize: '0.7rem',
-                              backgroundColor: '#d32f2f',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: '3px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Available Actions - When character selected */}
-              {selectedCharacter && (() => {
-                console.log('=== Rendering Available Actions ===');
-                console.log('Selected Character:', selectedCharacter);
-                console.log('Selected Object:', selectedObject);
-                const availableActions = getAvailableActions(selectedCharacter);
-                console.log('Available Actions returned:', availableActions);
-                const charIndex = Array.from(world.getAllEntities()).indexOf(selectedCharacter);
-                const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
-                const existingActionIndex = plannedActions.findIndex(a => a.characterId === selectedCharacter);
-                
-                return (
-                  <div style={{
-                    marginBottom: '0.75rem',
-                    padding: '0.75rem',
-                    backgroundColor: theme.colors.background,
-                    borderRadius: '6px',
-                    border: `1px solid ${theme.colors.imageBorder}`
-                  }}>
-                    <div style={{ 
-                      marginBottom: '0.5rem', 
-                      color: theme.colors.accent,
-                      fontSize: '0.9rem',
-                      fontWeight: 'bold'
-                    }}>
-                      {charName} - Select Action
-                    </div>
-                    <select
-                      value={existingActionIndex >= 0 ? plannedActions[existingActionIndex].action : 'Wait'}
-                      onChange={(e) => {
-                        const selectedActionName = e.target.value;
-                        if (selectedActionName === 'Wait' || selectedActionName === '') {
-                          // Remove action (set to Wait)
-                          if (existingActionIndex >= 0) {
-                            const newActions = plannedActions.filter((_, i) => i !== existingActionIndex);
-                            setPlannedActions(newActions);
-                          }
-                        } else {
-                          // Find the action by name
-                          const action = availableActions.find(a => a.name === selectedActionName);
-                          if (action) {
-                            const newAction: PlannedAction = {
-                              characterId: selectedCharacter,
-                              action: action.name,
-                              cost: action.cost,
-                              targetId: action.targetId || (action.requiresItem ? selectedObject || undefined : undefined)
-                            };
-                            
-                            if (existingActionIndex >= 0) {
-                              // Update existing action
-                              const newActions = [...plannedActions];
-                              newActions[existingActionIndex] = newAction;
-                              setPlannedActions(newActions);
-                            } else {
-                              // Add new action
-                              setPlannedActions([...plannedActions, newAction]);
-                            }
-                          }
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem',
-                        fontSize: '0.85rem',
-                        backgroundColor: theme.colors.cardBackground,
-                        color: theme.colors.text,
-                        border: `1px solid ${theme.colors.imageBorder}`,
-                        borderRadius: '4px'
-                      }}
-                    >
-                      <option value="Wait">Wait (0 stamina)</option>
-                      {availableActions.filter(a => a.name !== 'Wait').map((action, index) => (
-                        <option key={index} value={action.name}>
-                          {action.name} ({action.cost} stamina{action.requiresItem ? ', requires item' : ''})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })()}
-
-              {/* Skill Action Controls - Compact */}
-              <div style={{
-                marginBottom: '0.75rem',
-                display: 'flex',
-                gap: '0.5rem'
-              }}>
-                <button
-                  onClick={() => {
-                    // Restore original positions when going back
-                    originalPositions.forEach((originalPos, charId) => {
-                      movementSystem.moveCharacter(world, charId, originalPos);
-                    });
-                    setPlannedActions([]);
-                    phaseManagerRef.current.resetToMovement();
-                    setPhase(phaseManagerRef.current.getCurrentPhase());
-                    setSelectedCharacter(null);
-                    setSelectedObject(null);
-                    setTick(t => t + 1); // Trigger re-render
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    fontSize: '0.85rem',
-                    backgroundColor: theme.colors.cardBackground,
-                    color: theme.colors.text,
-                    border: `1px solid ${theme.colors.imageBorder}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => {
-                    // Execute all planned actions (or everyone waits if no actions planned)
-                    phaseManagerRef.current.transitionToExecuting();
-                    setPhase(phaseManagerRef.current.getCurrentPhase());
-                    
-                    // Execute actions using ActionExecutionSystem
-                    const executionSummary = actionExecutionSystemRef.current.executeActions(
-                      world,
-                      grid,
-                      plannedActions,
-                      getPlayerCharacters
-                    );
-                    
-                    // Handle execution results
-                    executionSummary.results.forEach((result) => {
-                      if (!result.success) {
-                        showStatus(result.error || 'Action execution failed', 'error');
-                      } else if (result.action.action === 'Push') {
-                        showStatus('Pushed crate!', 'success');
-                        // Trigger re-render to show the movement
-                        setTick(t => t + 1);
-                      }
-                    });
-                    
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1553',message:'After skill phase execution - checking win condition',data:{phase:'skill_execution'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-                    // #endregion
-                    
-                    // Check win condition immediately after executing actions
-                    const allInExitAfterActions = executionSummary.winConditionMet;
-                    // #region agent log
-                    const allCharactersAfterActions = getPlayerCharacters();
-                    fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1560',message:'Win condition result after skill phase',data:{allInExit:allInExitAfterActions,characterCount:allCharactersAfterActions.length,characterPositions:allCharactersAfterActions.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-                    // #endregion
-                    
-                    // Check win condition immediately after executing actions
-                    if (allInExitAfterActions) {
-                      console.log('✅ Win condition met after skill execution - calling completeMission()');
-                      // #region agent log
-                      fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1700',message:'Win condition met - calling completeMission from skill phase',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-                      // #endregion
-                      // Show status message
-                      if (activeCampaign && currentEncounterIndex !== undefined) {
-                        const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
-                        if (isLastEncounter) {
-                          showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
-                        } else {
-                          showStatus(`Encounter Complete! Loading next encounter...`, 'success', 2000);
-                        }
-                      } else {
-                        showStatus("All characters reached the exit! Mission Complete.", 'success', 3000);
-                        if (activeMission?.days) consumeFood(activeMission.days * 4);
-                      }
-                      // Call completeMission directly - no setTimeout delay needed
-                      completeMission();
-                      return; // Don't reset to movement phase
-                    }
-                    
-                    // Reset after execution (only if win condition not met)
-                    setTimeout(() => {
-                      // Increment turn - a complete cycle (movement + skill + execution) has finished
-                      turnSystemRef.current.incrementTurn();
-                      setCurrentTurn(turnSystemRef.current.getCurrentTurn() + 1); // Update displayed turn
-                      setPlannedActions([]);
-                      phaseManagerRef.current.resetToMovement();
-                      setPhase(phaseManagerRef.current.getCurrentPhase());
-                      setSelectedCharacter(null);
-                      setSelectedObject(null);
-                      // Update original positions for next turn
-                      const newOriginalPositions = new Map<number, { x: number; y: number }>();
-                      const playerCharacters = getPlayerCharacters();
-                      playerCharacters.forEach(charId => {
-                        const pos = world.getComponent<PositionComponent>(charId, 'Position');
-                        if (pos) {
-                          newOriginalPositions.set(charId, { x: pos.x, y: pos.y });
-                        }
-                      });
-                      setOriginalPositions(newOriginalPositions);
-                      setTick(t => t + 1);
-                    }, 500); // Give time for animations/visual feedback
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    fontSize: '0.85rem',
-                    backgroundColor: theme.colors.success,
-                    color: theme.colors.text,
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  Execute
-                </button>
-              </div>
-            </>
-          );
-        })()}
-
-        {/* Selected Entity Stats - Only show one at a time */}
-        {selectedCharacter && !selectedObject && (() => {
-          const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
-          
-          if (!attrs) return null;
-          
-          // Get character name from party
-          const charIndex = Array.from(world.getAllEntities()).indexOf(selectedCharacter);
-          const charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
-          const archetype = party[charIndex]?.archetype || 'Adventurer';
-          
-          return (
-            <div style={{
-              padding: '0.75rem',
-              backgroundColor: theme.colors.background,
-              borderRadius: '6px',
-              color: theme.colors.text,
-              marginBottom: '0.75rem',
-              border: `1px solid ${theme.colors.imageBorder}`
-            }}>
-              <h3 style={{ marginTop: 0, marginBottom: '0.25rem', color: theme.colors.accent, fontSize: '1rem' }}>
-                {charName}
-              </h3>
-              <div style={{ marginBottom: '0.5rem', fontSize: '0.75rem', color: theme.colors.accentLight }}>
-                {archetype}
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-                <div>PWR: {attrs.pwr}</div>
-                <div>MOV: {attrs.mov}</div>
-                <div>INF: {attrs.inf}</div>
-                <div>CRE: {attrs.cre}</div>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.8rem' }}>
-                <div>HP: 10/10</div>
-                <div>Stamina: 10/10</div>
-                <div>Gold: {party[charIndex]?.gold || 0}</div>
-                <div>Food: {party[charIndex]?.food || 0}</div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Item Stats - When item selected (only if no character selected) */}
-        {selectedObject && !selectedCharacter && (() => {
-          const pushable = world.getComponent<PushableComponent>(selectedObject, 'Pushable');
-          const renderable = world.getComponent<RenderableComponent>(selectedObject, 'Renderable');
-          
-          if (!pushable) return null;
-          
-          return (
-            <div style={{
-              padding: '0.75rem',
-              backgroundColor: theme.colors.background,
-              borderRadius: '6px',
-              color: theme.colors.text,
-              marginBottom: '0.75rem',
-              border: `1px solid ${theme.colors.imageBorder}`
-            }}>
-              <h3 style={{ marginTop: 0, marginBottom: '0.5rem', color: theme.colors.accent, fontSize: '1rem' }}>
-                {renderable?.char === 'C' ? 'Crate' : 'Item'}
-              </h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.8rem' }}>
-                <div>Type: Crate</div>
-                <div>Weight: {pushable.weight} lb</div>
-                <div>Pushable: Yes</div>
-              </div>
-            </div>
-          );
-        })()}
-
-      </div>
+      <EncounterInfoPanel
+        phase={phase}
+        currentTurn={currentTurn}
+        activeMission={activeMission}
+        activeCampaign={activeCampaign}
+        currentEncounterIndex={currentEncounterIndex}
+        selectedCharacter={selectedCharacter}
+        selectedObject={selectedObject}
+        plannedActions={plannedActions}
+        movementPlan={movementPlan}
+        world={world}
+        party={party}
+        pathUpdateTrigger={pathUpdateTrigger}
+        getInstructions={getInstructions}
+        getPlayerCharacters={getPlayerCharacters}
+        onCharacterClick={handleCharacterClick}
+        onUndoLastStep={handleUndoLastStep}
+        onClearAllMovements={handleClearAllMovements}
+        onPlanSkills={handlePlanSkills}
+        onExecuteActions={handleExecuteActions}
+        onBackToMovement={handleBackToMovement}
+        onActionSelect={handleActionSelect}
+        getAvailableActions={getAvailableActions}
+        onExecuteFreeMoves={handleExecuteFreeMoves}
+        onMoveActionUp={handleMoveActionUp}
+        onMoveActionDown={handleMoveActionDown}
+        onRemoveAction={handleRemoveAction}
+        validateAndGetExecuteButtonState={validateAndGetExecuteButtonState}
+      />
     </div>
   );
 };
