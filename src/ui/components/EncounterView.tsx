@@ -12,6 +12,7 @@ import { EncounterStateManager, PlannedAction, ValidMove, ValidPushDirection } f
 import { ActionExecutionSystem } from '../../game-engine/encounters/ActionExecutionSystem';
 import { EncounterGrid } from './encounter/EncounterGrid';
 import { EncounterInfoPanel } from './encounter/EncounterInfoPanel';
+import { useMovementPlanning } from './encounter/useMovementPlanning';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -46,6 +47,28 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const actionExecutionSystemRef = useRef<ActionExecutionSystem>(new ActionExecutionSystem());
   const winConditionSystem = new WinConditionSystem();
   const [currentTurn, setCurrentTurn] = useState(1); // Track turn for React re-renders
+
+  // Movement planning hook - provides movement-specific handlers
+  const movementPlanning = useMovementPlanning({
+    world,
+    grid,
+    movementPlan,
+    selectedCharacter,
+    onCharacterSelect: (charId) => {
+      if (charId === null) {
+        updateSelectedCharacter(null);
+        updateValidMoves([]);
+        updateSelectedObject(null);
+        updateValidPushDirections([]);
+      } else {
+        updateSelectedCharacter(charId);
+      }
+    },
+    onValidMovesUpdate: updateValidMoves,
+    onPathUpdate: () => setPathUpdateTrigger(t => t + 1),
+    onTick: () => setTick(t => t + 1),
+    showStatus,
+  });
 
   // Reset systems when encounter changes
   React.useEffect(() => {
@@ -272,39 +295,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
   const handleCharacterClick = (characterId: number) => {
     if (phase === 'movement') {
-      const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
-      if (!attrs) return;
-
-      // Get current position
-      const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
-      if (!currentPos) return;
-
-      // If clicking the same character, deselect
-      if (selectedCharacter === characterId) {
-        updateSelectedCharacter(null);
-        updateValidMoves([]);
-        updateSelectedObject(null);
-        updateValidPushDirections([]);
-        return;
-      }
-
-      // Select character and show valid moves
-      // If character has a planned path, use the last step in the path
-      // Otherwise, use current position
-      updateSelectedCharacter(characterId);
-      const path = movementPlan.getPath(characterId);
-      let fromPos: { x: number; y: number };
-      
-      if (path && path.steps.length > 0) {
-        // Use last step in planned path
-        fromPos = path.steps[path.steps.length - 1];
-      } else {
-        // No path planned, use current position
-        fromPos = { x: currentPos.x, y: currentPos.y };
-      }
-      
-      const moves = movementSystem.getValidMoves(world, grid, characterId, fromPos, attrs.mov);
-      updateValidMoves(moves);
+      // Use movement planning hook handler
+      movementPlanning.handleCharacterClick(characterId);
+      // Note: Adjacent object detection is handled in movement planning hook if needed
+      // For movement phase, we primarily care about path planning, not object selection
+      return;
     } else if (phase === 'skill') {
       // In skill phase, select character for action planning
       if (selectedCharacter === characterId) {
@@ -314,39 +309,39 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       }
       updateSelectedCharacter(characterId);
       updateSelectedObject(null);
-    }
-    
-    // Check if character is adjacent to any pushable objects
-    const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
-    if (!currentPos) return;
-    
-    const entities = world.getAllEntities();
-    const adjacentObjects: Array<{ id: number; pushActions: Array<{ direction: { dx: number; dy: number }; staminaCost: number }> }> = [];
-    
-    for (const entityId of entities) {
-      const pushable = world.getComponent<PushableComponent>(entityId, 'Pushable');
-      if (!pushable) continue;
       
-      const objPos = world.getComponent<PositionComponent>(entityId, 'Position');
-      if (!objPos) continue;
-      
-      const distance = grid.getDistance({ x: currentPos.x, y: currentPos.y }, objPos);
-      if (distance === 1) {
-        // Character is adjacent to this object
-        const pushActions = pushSystem.getValidPushActions(world, grid, characterId, entityId);
-        if (pushActions.length > 0) {
-          adjacentObjects.push({ id: entityId, pushActions });
+      // Check if character is adjacent to any pushable objects (for skill phase)
+      const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
+      if (currentPos) {
+        const entities = world.getAllEntities();
+        const adjacentObjects: Array<{ id: number; pushActions: Array<{ direction: { dx: number; dy: number }; staminaCost: number }> }> = [];
+        
+        for (const entityId of entities) {
+          const pushable = world.getComponent<PushableComponent>(entityId, 'Pushable');
+          if (!pushable) continue;
+          
+          const objPos = world.getComponent<PositionComponent>(entityId, 'Position');
+          if (!objPos) continue;
+          
+          const distance = grid.getDistance({ x: currentPos.x, y: currentPos.y }, objPos);
+          if (distance === 1) {
+            // Character is adjacent to this object
+            const pushActions = pushSystem.getValidPushActions(world, grid, characterId, entityId);
+            if (pushActions.length > 0) {
+              adjacentObjects.push({ id: entityId, pushActions });
+            }
+          }
+        }
+        
+        // If adjacent to exactly one object, auto-select it and show push directions
+        if (adjacentObjects.length === 1) {
+          updateSelectedObject(adjacentObjects[0].id);
+          updateValidPushDirections(adjacentObjects[0].pushActions.map(a => ({ ...a.direction, staminaCost: a.staminaCost })));
+        } else {
+          updateSelectedObject(null);
+          updateValidPushDirections([]);
         }
       }
-    }
-    
-    // If adjacent to exactly one object, auto-select it and show push directions
-    if (adjacentObjects.length === 1) {
-      updateSelectedObject(adjacentObjects[0].id);
-      updateValidPushDirections(adjacentObjects[0].pushActions.map(a => ({ ...a.direction, staminaCost: a.staminaCost })));
-    } else {
-      updateSelectedObject(null);
-      updateValidPushDirections([]);
     }
   };
 
@@ -355,73 +350,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const handleTileClick = (x: number, y: number) => {
     // Movement phase: plan paths instead of moving immediately
     if (phase === 'movement') {
-      // First, check if clicking on a character to select/deselect
-      const entities = world.getAllEntities();
-      const clickedEntity = entities.find(id => {
-        const r = world.getComponent<RenderableComponent>(id, 'Renderable');
-        const attrs = world.getComponent<AttributesComponent>(id, 'Attributes');
-        if (!r || !attrs) return false;
-        
-        const currentPos = world.getComponent<PositionComponent>(id, 'Position');
-        return currentPos && currentPos.x === x && currentPos.y === y && r.color === theme.colors.accent;
-      });
-
-      if (clickedEntity) {
-        handleCharacterClick(clickedEntity);
-        return;
-      }
-      
-      // If character is selected and this is a valid move, add to path (don't move yet)
-      if (selectedCharacter !== null) {
-        const attrs = world.getComponent<AttributesComponent>(selectedCharacter, 'Attributes');
-        if (!attrs) return;
-        
-        // Get the position to move from
-        // If character has a planned path, use the last step in the path
-        // Otherwise, use current position
-        const path = movementPlan.getPath(selectedCharacter);
-        let fromPos: { x: number; y: number };
-        
-        if (path && path.steps.length > 0) {
-          // Use last step in planned path
-          fromPos = path.steps[path.steps.length - 1];
-        } else {
-          // No path planned, use current position
-          const currentPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
-          if (!currentPos) return;
-          fromPos = { x: currentPos.x, y: currentPos.y };
-        }
-        
-        // Validate the step using MovementSystem
-        const isValidStep = movementSystem.canMoveFromTo(
-          world,
-          grid,
-          selectedCharacter,
-          fromPos,
-          { x, y },
-          attrs.mov
-        );
-        
-        if (isValidStep) {
-          // Add step to path
-          movementPlan.addStep(selectedCharacter, { x, y });
-          
-          // Trigger re-render to update button state
-          setPathUpdateTrigger(t => t + 1);
-          
-          // Update valid moves for next step (from the newly added position)
-          const moves = movementSystem.getValidMoves(world, grid, selectedCharacter, { x, y }, attrs.mov);
-          setValidMoves(moves);
-          
-          setTick(t => t + 1); // Trigger re-render to show path preview
-          return;
-        } else {
-          showStatus('Invalid move: not a valid movement pattern', 'error');
-          return; // IMPORTANT: Return to prevent falling through to legacy code
-        }
-      }
-      
-      // No character selected and not clicking on a character - do nothing
+      // Use movement planning hook handler
+      movementPlanning.handleTileClick(x, y);
       return;
     }
 
