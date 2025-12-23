@@ -9,6 +9,7 @@ import { TurnSystem } from '../../game-engine/encounters/TurnSystem';
 import { WinConditionSystem } from '../../game-engine/encounters/WinConditionSystem';
 import { EncounterPhaseManager, PlanningPhase } from '../../game-engine/encounters/EncounterPhaseManager';
 import { EncounterStateManager, PlannedAction, ValidMove, ValidPushDirection } from '../../game-engine/encounters/EncounterStateManager';
+import { ActionExecutionSystem } from '../../game-engine/encounters/ActionExecutionSystem';
 import { EncounterGrid } from './encounter/EncounterGrid';
 
 interface EncounterViewProps {
@@ -41,6 +42,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const turnSystemRef = useRef<TurnSystem>(new TurnSystem());
   const phaseManagerRef = useRef<EncounterPhaseManager>(new EncounterPhaseManager());
   const stateManagerRef = useRef<EncounterStateManager>(new EncounterStateManager());
+  const actionExecutionSystemRef = useRef<ActionExecutionSystem>(new ActionExecutionSystem());
   const winConditionSystem = new WinConditionSystem();
   const [currentTurn, setCurrentTurn] = useState(1); // Track turn for React re-renders
 
@@ -1366,80 +1368,22 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                     phaseManagerRef.current.transitionToExecuting();
                     setPhase(phaseManagerRef.current.getCurrentPhase());
                     
-                    // Execute each planned action
-                    plannedActions.forEach((plannedAction) => {
-                      if (plannedAction.action === 'Push' && plannedAction.targetId) {
-                        console.log(`🔄 Executing Push: character ${plannedAction.characterId}, object ${plannedAction.targetId}`);
-                        
-                        // Get valid push directions for this character and object
-                        const pushActions = pushSystem.getValidPushActions(
-                          world,
-                          grid,
-                          plannedAction.characterId,
-                          plannedAction.targetId
-                        );
-                        
-                        console.log(`  Found ${pushActions.length} valid push directions:`, pushActions);
-                        
-                        if (pushActions.length > 0) {
-                          // Find the direction that makes sense based on character position
-                          // Character should be behind the object in the push direction
-                          const charPos = world.getComponent<PositionComponent>(plannedAction.characterId, 'Position');
-                          const objPos = world.getComponent<PositionComponent>(plannedAction.targetId, 'Position');
-                          
-                          let pushDirection = pushActions[0].direction; // Default to first
-                          
-                          if (charPos && objPos) {
-                            // Calculate direction from character to object
-                            const charToObj = {
-                              dx: objPos.x - charPos.x,
-                              dy: objPos.y - charPos.y
-                            };
-                            
-                            // Find push direction that matches (character behind object)
-                            const matchingDirection = pushActions.find(pa => 
-                              pa.direction.dx === charToObj.dx && pa.direction.dy === charToObj.dy
-                            );
-                            
-                            if (matchingDirection) {
-                              pushDirection = matchingDirection.direction;
-                              console.log(`  ✅ Using matching direction: (${pushDirection.dx}, ${pushDirection.dy})`);
-                            } else {
-                              console.log(`  ⚠️ No matching direction found, using first: (${pushDirection.dx}, ${pushDirection.dy})`);
-                            }
-                          }
-                          
-                          // Get object's current position BEFORE pushing (copy the values, not the reference)
-                          const objPosComponent = world.getComponent<PositionComponent>(plannedAction.targetId, 'Position');
-                          if (!objPosComponent) {
-                            console.log(`❌ Object ${plannedAction.targetId} has no position`);
-                            showStatus('Cannot push: object has no position', 'error');
-                            return;
-                          }
-                          
-                          // Copy the position values (before they get modified by pushObject)
-                          const objOldPosition = { x: objPosComponent.x, y: objPosComponent.y };
-                          console.log(`  Object old position: (${objOldPosition.x}, ${objOldPosition.y})`);
-                          
-                          // Push the object (this modifies objPosComponent)
-                          pushSystem.pushObject(world, plannedAction.targetId, pushDirection);
-                          
-                          // Move character to object's old position (using the copied values)
-                          movementSystem.moveCharacter(world, plannedAction.characterId, objOldPosition);
-                          
-                          console.log(`✅ Pushed object ${plannedAction.targetId} in direction (${pushDirection.dx}, ${pushDirection.dy})`);
-                          console.log(`✅ Moved character ${plannedAction.characterId} to object's old position (${objOldPosition.x}, ${objOldPosition.y})`);
-                          showStatus(`Pushed crate!`, 'success');
-                          
-                          // Trigger re-render to show the movement
-                          setTick(t => t + 1);
-                        } else {
-                          console.log(`❌ No valid push directions for character ${plannedAction.characterId} and object ${plannedAction.targetId}`);
-                          showStatus('Cannot push: no valid direction', 'error');
-                        }
-                      } else if (plannedAction.action === 'Wait') {
-                        // Wait action - do nothing
-                        console.log(`Character ${plannedAction.characterId} waits`);
+                    // Execute actions using ActionExecutionSystem
+                    const executionSummary = actionExecutionSystemRef.current.executeActions(
+                      world,
+                      grid,
+                      plannedActions,
+                      getPlayerCharacters
+                    );
+                    
+                    // Handle execution results
+                    executionSummary.results.forEach((result) => {
+                      if (!result.success) {
+                        showStatus(result.error || 'Action execution failed', 'error');
+                      } else if (result.action.action === 'Push') {
+                        showStatus('Pushed crate!', 'success');
+                        // Trigger re-render to show the movement
+                        setTick(t => t + 1);
                       }
                     });
                     
@@ -1447,8 +1391,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                     fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1553',message:'After skill phase execution - checking win condition',data:{phase:'skill_execution'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
                     // #endregion
                     
-                    // Check for win condition after executing actions
-                    const allInExitAfterActions = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
+                    // Check win condition immediately after executing actions
+                    const allInExitAfterActions = executionSummary.winConditionMet;
                     // #region agent log
                     const allCharactersAfterActions = getPlayerCharacters();
                     fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1560',message:'Win condition result after skill phase',data:{allInExit:allInExitAfterActions,characterCount:allCharactersAfterActions.length,characterPositions:allCharactersAfterActions.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
