@@ -1,6 +1,6 @@
 import { World } from '../ecs/World';
 import { Grid } from '../grid/Grid';
-import { PositionComponent } from '../ecs/Component';
+import { PositionComponent, DirectionComponent } from '../ecs/Component';
 import { MovementSystem } from './MovementSystem';
 import { PushSystem } from './PushSystem';
 import { PlannedAction } from './EncounterStateManager';
@@ -112,6 +112,14 @@ export class ActionExecutionSystem {
       }
     }
 
+    // Calculate direction of movement
+    const dx = targetPos.x - charPos.x;
+    const dy = targetPos.y - charPos.y;
+    
+    // Normalize direction to -1, 0, or 1
+    const normalizedDx = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+    const normalizedDy = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+
     // Execute move
     const moveSuccess = this.movementSystem.moveCharacter(world, characterId, targetPos);
     if (!moveSuccess) {
@@ -121,6 +129,22 @@ export class ActionExecutionSystem {
         error: 'Failed to move character',
         apRemaining: apSystem.getAP(characterId),
       };
+    }
+
+    // Update character's facing direction to match movement direction
+    let directionComp = world.getComponent<DirectionComponent>(characterId, 'Direction');
+    if (!directionComp) {
+      // Create new direction component if it doesn't exist
+      directionComp = {
+        type: 'Direction',
+        dx: normalizedDx,
+        dy: normalizedDy,
+      };
+      world.addComponent(characterId, directionComp);
+    } else {
+      // Update existing direction component
+      directionComp.dx = normalizedDx;
+      directionComp.dy = normalizedDy;
     }
 
     // Deduct AP
@@ -161,25 +185,17 @@ export class ActionExecutionSystem {
       };
     }
 
-    // Get valid push directions for this character and object
-    const pushActions = this.pushSystem.getValidPushActions(
-      world,
-      grid,
-      characterId,
-      targetId
-    );
-
-    if (pushActions.length === 0) {
+    // Get character's facing direction
+    const directionComp = world.getComponent<DirectionComponent>(characterId, 'Direction');
+    if (!directionComp) {
       return {
         success: false,
         action: { characterId, action: 'Push', targetId },
-        error: 'No valid push directions',
+        error: 'Character has no facing direction',
         apRemaining: apSystem.getAP(characterId),
       };
     }
 
-    // Find the direction that makes sense based on character position
-    // Character should be behind the object in the push direction
     const charPos = world.getComponent<PositionComponent>(characterId, 'Position');
     const objPos = world.getComponent<PositionComponent>(targetId, 'Position');
 
@@ -192,21 +208,50 @@ export class ActionExecutionSystem {
       };
     }
 
-    let pushDirection = pushActions[0].direction; // Default to first
-
     // Calculate direction from character to object
     const charToObj = {
       dx: objPos.x - charPos.x,
       dy: objPos.y - charPos.y,
     };
 
-    // Find push direction that matches (character behind object)
-    const matchingDirection = pushActions.find(pa =>
-      pa.direction.dx === charToObj.dx && pa.direction.dy === charToObj.dy
+    // Normalize to -1, 0, or 1
+    const normalizedCharToObj = {
+      dx: charToObj.dx === 0 ? 0 : (charToObj.dx > 0 ? 1 : -1),
+      dy: charToObj.dy === 0 ? 0 : (charToObj.dy > 0 ? 1 : -1),
+    };
+
+    // Check if character is facing the object
+    if (directionComp.dx !== normalizedCharToObj.dx || directionComp.dy !== normalizedCharToObj.dy) {
+      return {
+        success: false,
+        action: { characterId, action: 'Push', targetId },
+        error: 'Character must be facing the object to push',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Use the character's facing direction as the push direction
+    const pushDirection = {
+      dx: directionComp.dx,
+      dy: directionComp.dy,
+    };
+
+    // Validate that this push is actually possible
+    const canPushResult = this.pushSystem.canPush(
+      world,
+      grid,
+      characterId,
+      targetId,
+      pushDirection
     );
 
-    if (matchingDirection) {
-      pushDirection = matchingDirection.direction;
+    if (!canPushResult.canPush) {
+      return {
+        success: false,
+        action: { characterId, action: 'Push', targetId },
+        error: canPushResult.reason || 'Cannot push in this direction',
+        apRemaining: apSystem.getAP(characterId),
+      };
     }
 
     // Get object's current position BEFORE pushing (copy the values, not the reference)
@@ -240,6 +285,71 @@ export class ActionExecutionSystem {
   }
 
   /**
+   * Execute a turn action immediately
+   * Changes the character's facing direction
+   * Deducts 5 AP from the character
+   * 
+   * @param world - The ECS world
+   * @param characterId - The character ID
+   * @param direction - Direction {dx, dy} to face (-1, 0, or 1 for each component)
+   * @param apSystem - ActionPointSystem to deduct AP
+   * @returns Execution result with success status and remaining AP
+   */
+  executeTurnAction(
+    world: World,
+    characterId: number,
+    direction: { dx: number; dy: number },
+    apSystem: ActionPointSystem
+  ): ActionExecutionResult {
+    // Validate direction (must be -1, 0, or 1 for each component, and at least one must be non-zero)
+    if ((direction.dx !== -1 && direction.dx !== 0 && direction.dx !== 1) ||
+        (direction.dy !== -1 && direction.dy !== 0 && direction.dy !== 1) ||
+        (direction.dx === 0 && direction.dy === 0)) {
+      return {
+        success: false,
+        action: { characterId, action: 'Turn' },
+        error: 'Invalid direction (must be -1, 0, or 1 for dx/dy, at least one non-zero)',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if character can afford the turn
+    if (!apSystem.canAffordTurn(characterId)) {
+      return {
+        success: false,
+        action: { characterId, action: 'Turn' },
+        error: 'Insufficient AP to turn',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Get or create direction component
+    let directionComp = world.getComponent<DirectionComponent>(characterId, 'Direction');
+    if (!directionComp) {
+      // Create new direction component (default to facing right)
+      directionComp = {
+        type: 'Direction',
+        dx: 1,
+        dy: 0,
+      };
+      world.addComponent(characterId, directionComp);
+    }
+
+    // Update direction
+    directionComp.dx = direction.dx;
+    directionComp.dy = direction.dy;
+
+    // Deduct AP
+    const remainingAP = apSystem.deductAP(characterId, ACTION_COSTS.TURN);
+
+    return {
+      success: true,
+      action: { characterId, action: 'Turn' },
+      apRemaining: remainingAP,
+    };
+  }
+
+  /**
    * Execute a pass action
    * Ends the character's turn and resets their AP to 50
    * 
@@ -268,7 +378,7 @@ export class ActionExecutionSystem {
     apSystem.resetAP(characterId);
 
     // Pass the turn (this will advance to next character or complete round)
-    const roundComplete = turnSystem.passTurn();
+    turnSystem.passTurn();
 
     return {
       success: true,

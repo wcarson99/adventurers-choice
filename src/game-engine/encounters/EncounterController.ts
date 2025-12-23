@@ -9,7 +9,6 @@ import { MovementSystem } from './MovementSystem';
 import { PushSystem } from './PushSystem';
 import { MovementPlan } from './MovementPlan';
 import { ActionPointSystem } from './ActionPointSystem';
-import { ACTION_COSTS } from './constants';
 
 /**
  * EncounterController orchestrates all encounter systems and provides a unified interface
@@ -83,12 +82,14 @@ export class EncounterController {
    * @param actionType - Action type: 'Move', 'Push', or 'Pass'
    * @returns True if character can afford the action
    */
-  canAffordAction(characterId: number, actionType: 'Move' | 'Push' | 'Pass'): boolean {
+  canAffordAction(characterId: number, actionType: 'Move' | 'Push' | 'Turn' | 'Pass'): boolean {
     switch (actionType) {
       case 'Move':
         return this.apSystem.canAffordMove(characterId);
       case 'Push':
         return this.apSystem.canAffordPush(characterId);
+      case 'Turn':
+        return this.apSystem.canAffordTurn(characterId);
       case 'Pass':
         return true; // Pass always costs 0 AP
       default:
@@ -127,9 +128,9 @@ export class EncounterController {
   executeActionImmediate(
     world: World,
     grid: Grid,
-    actionType: 'Move' | 'Push' | 'Pass',
+    actionType: 'Move' | 'Push' | 'Turn' | 'Pass',
     characterId: number,
-    target?: { x: number; y: number } | number
+    target?: { x: number; y: number } | number | { dx: number; dy: number }
   ): ActionExecutionResult {
     // Verify this is the current active character's turn
     const currentActive = this.turnSystem.getCurrentActiveCharacter();
@@ -155,7 +156,7 @@ export class EncounterController {
     // Execute the action
     switch (actionType) {
       case 'Move':
-        if (!target || typeof target === 'number') {
+        if (!target || typeof target === 'number' || ('dx' in target && 'dy' in target)) {
           return {
             success: false,
             action: { characterId, action: actionType },
@@ -183,6 +184,22 @@ export class EncounterController {
         return this.actionExecutionSystem.executePushAction(
           world,
           grid,
+          characterId,
+          target,
+          this.apSystem
+        );
+
+      case 'Turn':
+        if (!target || typeof target === 'number' || ('x' in target && 'y' in target)) {
+          return {
+            success: false,
+            action: { characterId, action: actionType },
+            error: 'Turn action requires direction {dx, dy}',
+            apRemaining: this.apSystem.getAP(characterId),
+          };
+        }
+        return this.actionExecutionSystem.executeTurnAction(
+          world,
           characterId,
           target,
           this.apSystem

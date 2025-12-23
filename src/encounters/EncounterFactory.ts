@@ -5,6 +5,7 @@ import {
   RenderableComponent,
   AttributesComponent,
   PushableComponent,
+  DirectionComponent,
 } from '../game-engine/ecs/Component';
 import type { EncounterDefinition, EntityPlacement } from '../campaigns/Campaign';
 import type { Character } from '../game-engine/GameState';
@@ -104,6 +105,13 @@ export class EncounterFactory {
       inf: props.attributes.inf,
       cre: props.attributes.cre,
     } as AttributesComponent);
+
+    // Add direction component (default facing right)
+    world.addComponent(entityId, {
+      type: 'Direction',
+      dx: 1,
+      dy: 0,
+    } as DirectionComponent);
   }
 
   /**

@@ -7,6 +7,7 @@
 export const ACTION_COSTS = {
   MOVE: 15,
   PUSH: 25,
+  TURN: 5,
   PASS: 0,
 } as const;
 

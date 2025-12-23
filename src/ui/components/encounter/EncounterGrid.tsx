@@ -1,7 +1,7 @@
 import React from 'react';
 import { Grid } from '../../../game-engine/grid/Grid';
 import { World } from '../../../game-engine/ecs/World';
-import { PositionComponent, RenderableComponent } from '../../../game-engine/ecs/Component';
+import { PositionComponent, RenderableComponent, DirectionComponent } from '../../../game-engine/ecs/Component';
 import { MovementPlan } from '../../../game-engine/encounters/MovementPlan';
 import { PlanningPhase } from '../../../game-engine/encounters/EncounterPhaseManager';
 import { ValidMove, ValidPushDirection } from '../../../game-engine/encounters/EncounterStateManager';
@@ -18,6 +18,7 @@ interface EncounterGridProps {
   movementPlan: MovementPlan;
   showTileCoordinates: boolean;
   onTileClick: (x: number, y: number) => void;
+  selectingDirection?: boolean;
 }
 
 export const EncounterGrid: React.FC<EncounterGridProps> = ({
@@ -31,6 +32,7 @@ export const EncounterGrid: React.FC<EncounterGridProps> = ({
   movementPlan,
   showTileCoordinates,
   onTileClick,
+  selectingDirection = false,
 }) => {
   const tiles = Array.from({ length: grid.width * grid.height }, (_, i) => grid.getCoords(i));
 
@@ -202,6 +204,36 @@ export const EncounterGrid: React.FC<EncounterGridProps> = ({
                   {renderable.char}
                 </div>
               ) : null}
+              {/* Show direction indicator (red circle) */}
+              {entityId && (() => {
+                const direction = world.getComponent<DirectionComponent>(entityId, 'Direction');
+                if (!direction) return null;
+                
+                // Calculate position for the red circle based on direction
+                // Place it on the edge of the tile in the facing direction
+                const offsetX = direction.dx * 0.35; // 35% from center toward edge
+                const offsetY = direction.dy * 0.35;
+                
+                return (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `calc(50% + ${offsetX * tileSize}px)`,
+                      top: `calc(50% + ${offsetY * tileSize}px)`,
+                      transform: 'translate(-50%, -50%)',
+                      width: '12px',
+                      height: '12px',
+                      backgroundColor: '#ff0000',
+                      borderRadius: '50%',
+                      border: '2px solid #ffffff',
+                      boxShadow: '0 0 4px rgba(0,0,0,0.5)',
+                      pointerEvents: 'none',
+                      zIndex: 10
+                    }}
+                    title={`Facing: (${direction.dx}, ${direction.dy})`}
+                  />
+                );
+              })()}
               {/* Show current position hint */}
               {isCurrentPosition && phase === 'movement' && selectedCharacter && (
                 <div style={{

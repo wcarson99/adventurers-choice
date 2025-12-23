@@ -38,6 +38,9 @@ interface EncounterInfoPanelProps {
   getCurrentActiveCharacter?: () => number | null;
   getCharacterAP?: (characterId: number) => number;
   onPass?: () => void;
+  // Turn action props
+  selectingDirection?: boolean;
+  onDirectionSelect?: (dx: number, dy: number) => void;
 }
 
 // Runtime check: This will fail if old code tries to import this module
@@ -61,7 +64,7 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
   party,
   pathUpdateTrigger: _pathUpdateTrigger, // @deprecated
   getInstructions,
-  getPlayerCharacters,
+  getPlayerCharacters: _getPlayerCharacters,
   onCharacterClick,
   onUndoLastStep: _onUndoLastStep, // @deprecated
   onClearAllMovements: _onClearAllMovements, // @deprecated
@@ -78,6 +81,8 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
   getCurrentActiveCharacter,
   getCharacterAP,
   onPass,
+  selectingDirection = false,
+  onDirectionSelect,
 }) => {
   // CRITICAL CHECK: Verify new code is running
   if (typeof window !== 'undefined' && !(window as any).__ENCOUNTER_INFO_PANEL_V2__) {
@@ -239,48 +244,88 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
               </span>
             </div>
             
+            {/* Direction Selection Message (when Turn action is selected) */}
+            {selectingDirection && (
+              <div style={{ 
+                marginBottom: '1rem', 
+                padding: '0.75rem',
+                backgroundColor: theme.colors.accent,
+                color: theme.colors.text,
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                textAlign: 'center'
+              }}>
+                👆 Click on the grid to select direction
+                <button
+                  onClick={() => {
+                    // Cancel direction selection
+                    if (onActionSelect) {
+                      onActionSelect('Cancel', undefined);
+                    }
+                  }}
+                  style={{
+                    display: 'block',
+                    marginTop: '0.5rem',
+                    margin: '0.5rem auto 0',
+                    padding: '0.25rem 0.5rem',
+                    fontSize: '0.8rem',
+                    backgroundColor: theme.colors.imageBackground,
+                    color: theme.colors.text,
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
             {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {availableActions.map((action, index) => {
-                const canAfford = currentAP >= action.cost;
-                const isPass = action.name === 'Pass';
-                
-                return (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      if (action.name === 'Pass' && onPass) {
-                        onPass();
-                      } else {
-                        onActionSelect(action.name, action.targetId);
-                      }
-                    }}
-                    disabled={!canAfford && !isPass}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      fontSize: '0.85rem',
-                      backgroundColor: isPass 
-                        ? theme.colors.success 
-                        : canAfford 
-                          ? theme.colors.accent 
-                          : theme.colors.imageBackground,
-                      color: theme.colors.text,
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: (canAfford || isPass) ? 'pointer' : 'not-allowed',
-                      fontWeight: 'bold',
-                      opacity: (canAfford || isPass) ? 1 : 0.5,
-                      textAlign: 'left'
-                    }}
-                    title={!canAfford && !isPass ? `Insufficient AP (need ${action.cost}, have ${currentAP})` : ''}
-                  >
-                    {action.name} ({action.cost} AP)
-                    {action.requiresItem && action.targetId && ' - Target Selected'}
-                  </button>
-                );
-              })}
-            </div>
+            {!selectingDirection && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {availableActions.map((action, index) => {
+                  const canAfford = currentAP >= action.cost;
+                  const isPass = action.name === 'Pass';
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        if (action.name === 'Pass' && onPass) {
+                          onPass();
+                        } else {
+                          onActionSelect(action.name, action.targetId);
+                        }
+                      }}
+                      disabled={!canAfford && !isPass}
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem',
+                        fontSize: '0.85rem',
+                        backgroundColor: isPass 
+                          ? theme.colors.success 
+                          : canAfford 
+                            ? theme.colors.accent 
+                            : theme.colors.imageBackground,
+                        color: theme.colors.text,
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: (canAfford || isPass) ? 'pointer' : 'not-allowed',
+                        fontWeight: 'bold',
+                        opacity: (canAfford || isPass) ? 1 : 0.5,
+                        textAlign: 'left'
+                      }}
+                      title={!canAfford && !isPass ? `Insufficient AP (need ${action.cost}, have ${currentAP})` : ''}
+                    >
+                      {action.name} ({action.cost} AP)
+                      {action.requiresItem && action.targetId && ' - Target Selected'}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             
             {/* Select Character Button */}
             {!isSelected && (

@@ -7,7 +7,7 @@
       "id": "push-test-encounter",
       "name": "Push Test Encounter",
       "description": "Basic encounter with one crate to test push mechanics",
-      "testInstructions": "AI Tester: Move Warrior from (0,1) to (1,1), then push the crate at (2,1) to the right",
+      "testInstructions": "AI Tester: Move Warrior from (0,1) to (1,1), then push the crate at (2,2) to the right",
       "grid": {
         "width": 10,
         "height": 10
@@ -30,7 +30,7 @@
         },
         {
           "type": "crate",
-          "position": { "x": 2, "y": 1 },
+          "position": { "x": 2, "y": 2 },
           "properties": {
             "weight": 30,
             "sprite": "/assets/items/crate.png"

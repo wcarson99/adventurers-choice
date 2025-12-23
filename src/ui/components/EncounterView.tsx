@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useGame } from '../../game-engine/GameState';
-import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from '../../game-engine/ecs/Component';
+import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent, DirectionComponent } from '../../game-engine/ecs/Component';
 import { theme } from '../styles/theme';
 import { ValidMove } from '../../game-engine/encounters/EncounterStateManager';
 import { EncounterController } from '../../game-engine/encounters/EncounterController';
@@ -25,6 +25,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const [validMoves, setValidMoves] = useState<Array<{ x: number; y: number }>>([]);
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
   const [validPushDirections, setValidPushDirections] = useState<Array<{ dx: number; dy: number; staminaCost: number }>>([]);
+  const [selectingDirection, setSelectingDirection] = useState<boolean>(false);
   const encounterControllerRef = useRef<EncounterController>(new EncounterController());
   const [currentRound, setCurrentRound] = useState(1); // Track round for React re-renders
   
@@ -155,44 +156,41 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     // Always include Pass action (costs 0 AP)
     actions.push({ name: 'Pass', cost: 0 });
     
+    // Add Turn action if character can afford it (5 AP)
+    if (encounterControllerRef.current.canAffordAction(characterId, 'Turn')) {
+      actions.push({ name: 'Turn', cost: 5 });
+    }
+    
     // Add Move action if character can afford it (15 AP)
     if (encounterControllerRef.current.canAffordAction(characterId, 'Move')) {
       actions.push({ name: 'Move', cost: 15 });
     }
     
     // Check if character can push (PWR 3+) and can afford it (25 AP)
+    // Only enable if character is facing a pushable item
     if (attrs.pwr >= 3 && encounterControllerRef.current.canAffordAction(characterId, 'Push')) {
       const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
+      const directionComp = world.getComponent<DirectionComponent>(characterId, 'Direction');
       const charPos = currentPos ? { x: currentPos.x, y: currentPos.y } : null;
       
-      if (charPos) {
-        // Look for adjacent pushable objects
-        let targetPushable: number | undefined;
-        
-        // First check selected object
-        if (selectedObject) {
-          const pushable = world.getComponent<PushableComponent>(selectedObject, 'Pushable');
-          if (pushable) {
-            const objPos = world.getComponent<PositionComponent>(selectedObject, 'Position');
-            if (objPos && grid.getDistance(charPos, objPos) === 1) {
-              targetPushable = selectedObject;
-            }
-          }
-        }
-        
-        // If no selected object, look for any adjacent pushable
-        if (!targetPushable) {
-          const entities = world.getAllEntities();
-          targetPushable = entities.find(id => {
-            const pushable = world.getComponent<PushableComponent>(id, 'Pushable');
-            if (!pushable) return false;
-            const objPos = world.getComponent<PositionComponent>(id, 'Position');
-            if (!objPos) return false;
-            return grid.getDistance(charPos, objPos) === 1;
-          });
-        }
+      if (charPos && directionComp) {
+        // Check for pushable object in the direction the character is facing
+        const targetPos = {
+          x: charPos.x + directionComp.dx,
+          y: charPos.y + directionComp.dy,
+        };
 
-        // If found pushable object, check if push is valid
+        // Look for a pushable object at the target position
+        const entities = world.getAllEntities();
+        const targetPushable = entities.find(id => {
+          const pushable = world.getComponent<PushableComponent>(id, 'Pushable');
+          if (!pushable) return false;
+          const objPos = world.getComponent<PositionComponent>(id, 'Position');
+          if (!objPos) return false;
+          return objPos.x === targetPos.x && objPos.y === targetPos.y;
+        });
+
+        // If found pushable object in facing direction, check if push is valid
         if (targetPushable) {
           const pushActions = pushSystem.getValidPushActions(world, grid, characterId, targetPushable);
           if (pushActions.length > 0) {
@@ -234,6 +232,33 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     const currentActiveCharacter = encounterControllerRef.current.getCurrentActiveCharacter();
     if (currentActiveCharacter === null) {
       return; // No active character
+    }
+
+    // If selecting direction for Turn action, handle direction selection
+    if (selectingDirection && selectedCharacter === currentActiveCharacter) {
+      const charPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
+      if (!charPos) {
+        showStatus('Character has no position', 'error');
+        return;
+      }
+
+      // Calculate direction from character to clicked tile
+      const dx = x - charPos.x;
+      const dy = y - charPos.y;
+
+      // Normalize direction to -1, 0, or 1
+      const normalizedDx = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+      const normalizedDy = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+
+      // Don't allow turning to (0, 0) - must face a direction
+      if (normalizedDx === 0 && normalizedDy === 0) {
+        showStatus('Cannot face the same position', 'error');
+        return;
+      }
+
+      // Execute turn action
+      handleDirectionSelect(normalizedDx, normalizedDy);
+      return;
     }
 
     // If character is selected, try to execute move action immediately
@@ -428,6 +453,18 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       return;
     }
 
+    if (actionName === 'Turn') {
+      // Show direction selection UI
+      setSelectingDirection(true);
+      return;
+    }
+
+    if (actionName === 'Cancel') {
+      // Cancel direction selection
+      setSelectingDirection(false);
+      return;
+    }
+
     if (actionName === 'Push' && targetId) {
       const result = encounterControllerRef.current.executeActionImmediate(
         world,
@@ -456,6 +493,34 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       }
     }
     // Move actions are handled via tile clicks
+  };
+
+  // Handle direction selection for Turn action
+  const handleDirectionSelect = (dx: number, dy: number) => {
+    const currentActiveCharacter = encounterControllerRef.current.getCurrentActiveCharacter();
+    if (currentActiveCharacter === null) {
+      showStatus('No active character', 'error');
+      return;
+    }
+
+    const result = encounterControllerRef.current.executeActionImmediate(
+      world,
+      grid,
+      'Turn',
+      currentActiveCharacter,
+      { dx, dy }
+    );
+
+    if (result.success) {
+      showStatus(`Turned! ${result.apRemaining} AP remaining`, 'success');
+      setSelectingDirection(false);
+      setTick(t => t + 1);
+
+      // Keep character selected and default to Move or Pass
+      keepCharacterSelectedWithDefaultAction(currentActiveCharacter);
+    } else {
+      showStatus(result.error || 'Turn failed', 'error');
+    }
   };
 
   // @deprecated - Old phase-based handlers removed (no longer used with AP system)
@@ -504,6 +569,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         onExecuteActions={() => {}} // @deprecated - no longer used
         onBackToMovement={() => {}} // @deprecated - no longer used
         onActionSelect={handleActionClick} // Updated to use new handler
+        selectingDirection={selectingDirection}
+        onDirectionSelect={handleDirectionSelect}
         getAvailableActions={getAvailableActions}
         onExecuteFreeMoves={undefined} // @deprecated - no longer used
         onMoveActionUp={undefined} // @deprecated - no longer used

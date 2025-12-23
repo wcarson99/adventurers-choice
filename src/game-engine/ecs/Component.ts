@@ -1,4 +1,4 @@
-export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled' | 'Attributes' | 'Pushable';
+export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled' | 'Attributes' | 'Pushable' | 'Direction';
 
 export interface Component {
   type: ComponentType;
@@ -41,4 +41,10 @@ export interface PushableComponent extends Component {
   type: 'Pushable';
   weight: number; // Weight in pounds
   sprite?: string; // Optional sprite path
+}
+
+export interface DirectionComponent extends Component {
+  type: 'Direction';
+  dx: number; // Direction x component (-1, 0, or 1)
+  dy: number; // Direction y component (-1, 0, or 1)
 }

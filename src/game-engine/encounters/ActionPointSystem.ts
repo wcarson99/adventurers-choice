@@ -74,6 +74,16 @@ export class ActionPointSystem {
   }
 
   /**
+   * Check if a character can afford a turn action
+   * 
+   * @param characterId - The character ID
+   * @returns True if character can afford TURN action
+   */
+  canAffordTurn(characterId: number): boolean {
+    return this.canAfford(characterId, ACTION_COSTS.TURN);
+  }
+
+  /**
    * Reset all AP tracking (for new encounter)
    */
   reset(): void {
