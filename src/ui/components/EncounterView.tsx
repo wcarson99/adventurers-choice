@@ -2,14 +2,10 @@ import React, { useState, useRef } from 'react';
 import { useGame } from '../../game-engine/GameState';
 import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from '../../game-engine/ecs/Component';
 import { theme } from '../styles/theme';
-import { MovementSystem } from '../../game-engine/encounters/MovementSystem';
-import { PushSystem } from '../../game-engine/encounters/PushSystem';
 import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
-import { TurnSystem } from '../../game-engine/encounters/TurnSystem';
-import { WinConditionSystem } from '../../game-engine/encounters/WinConditionSystem';
-import { EncounterPhaseManager, PlanningPhase } from '../../game-engine/encounters/EncounterPhaseManager';
-import { EncounterStateManager, PlannedAction, ValidMove, ValidPushDirection } from '../../game-engine/encounters/EncounterStateManager';
-import { ActionExecutionSystem } from '../../game-engine/encounters/ActionExecutionSystem';
+import { PlanningPhase } from '../../game-engine/encounters/EncounterPhaseManager';
+import { PlannedAction, ValidMove, ValidPushDirection } from '../../game-engine/encounters/EncounterStateManager';
+import { EncounterController } from '../../game-engine/encounters/EncounterController';
 import { EncounterGrid } from './encounter/EncounterGrid';
 import { EncounterInfoPanel } from './encounter/EncounterInfoPanel';
 import { useMovementPlanning } from './encounter/useMovementPlanning';
@@ -37,17 +33,14 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const [validMoves, setValidMoves] = useState<Array<{ x: number; y: number }>>([]);
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
   const [validPushDirections, setValidPushDirections] = useState<Array<{ dx: number; dy: number; staminaCost: number }>>([]);
-  const [movementPlan] = useState<MovementPlan>(() => new MovementPlan());
   const [pathUpdateTrigger, setPathUpdateTrigger] = useState(0); // Force re-render when paths change
-  // Removed unused isCompletingRef
-  const movementSystem = new MovementSystem();
-  const pushSystem = new PushSystem();
-  const turnSystemRef = useRef<TurnSystem>(new TurnSystem());
-  const phaseManagerRef = useRef<EncounterPhaseManager>(new EncounterPhaseManager());
-  const stateManagerRef = useRef<EncounterStateManager>(new EncounterStateManager());
-  const actionExecutionSystemRef = useRef<ActionExecutionSystem>(new ActionExecutionSystem());
-  const winConditionSystem = new WinConditionSystem();
+  const encounterControllerRef = useRef<EncounterController>(new EncounterController());
   const [currentTurn, setCurrentTurn] = useState(1); // Track turn for React re-renders
+  
+  // Get systems from controller for convenience
+  const movementPlan = encounterControllerRef.current.getMovementPlan();
+  const movementSystem = encounterControllerRef.current.getMovementSystem();
+  const pushSystem = encounterControllerRef.current.getPushSystem();
 
   // Movement planning hook - provides movement-specific handlers
   const movementPlanning = useMovementPlanning({
@@ -94,9 +87,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   // Reset systems when encounter changes
   React.useEffect(() => {
     if (currentEncounterIndex !== undefined) {
-      turnSystemRef.current.reset();
-      phaseManagerRef.current.reset();
-      stateManagerRef.current.reset();
+      encounterControllerRef.current.reset();
       setCurrentTurn(1); // Reset displayed turn to 1
       setPhase('movement'); // Reset phase to movement
       // Sync React state with state manager
@@ -151,40 +142,40 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     return '👆 Click a character to select, then move or push crates';
   };
 
-  // Helper functions to sync React state with state manager
+  // Helper functions to sync React state with EncounterController
   const updateSelectedCharacter = (characterId: number | null) => {
-    stateManagerRef.current.setSelectedCharacter(characterId);
+    encounterControllerRef.current.setSelectedCharacter(characterId);
     setSelectedCharacter(characterId);
   };
 
   const updateSelectedObject = (objectId: number | null) => {
-    stateManagerRef.current.setSelectedObject(objectId);
+    encounterControllerRef.current.setSelectedObject(objectId);
     setSelectedObject(objectId);
   };
 
   const updateValidMoves = (moves: ValidMove[]) => {
-    stateManagerRef.current.setValidMoves(moves);
+    encounterControllerRef.current.setValidMoves(moves);
     setValidMoves(moves);
   };
 
   const updateValidPushDirections = (directions: ValidPushDirection[]) => {
-    stateManagerRef.current.setValidPushDirections(directions);
+    encounterControllerRef.current.setValidPushDirections(directions);
     setValidPushDirections(directions);
   };
 
   const updatePlannedActions = (actions: PlannedAction[]) => {
-    stateManagerRef.current.clearPlannedActions();
-    actions.forEach(action => stateManagerRef.current.addPlannedAction(action));
+    encounterControllerRef.current.setPlannedActions(actions);
     setPlannedActions(actions);
   };
 
   const addPlannedAction = (action: PlannedAction) => {
-    stateManagerRef.current.addPlannedAction(action);
-    setPlannedActions(stateManagerRef.current.getPlannedActions());
+    const currentActions = encounterControllerRef.current.getPlannedActions();
+    encounterControllerRef.current.setPlannedActions([...currentActions, action]);
+    setPlannedActions(encounterControllerRef.current.getPlannedActions());
   };
 
   const clearPlannedActions = () => {
-    stateManagerRef.current.clearPlannedActions();
+    encounterControllerRef.current.setPlannedActions([]);
     setPlannedActions([]);
   };
 
@@ -427,7 +418,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:509',message:'Win condition check - legacy execution path',data:{phase:'legacy_execution'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
-        const allInExit = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
+        const allInExit = encounterControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
         // #region agent log
         const allCharacters = getPlayerCharacters();
         fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:515',message:'Win condition result',data:{allInExit,characterCount:allCharacters.length,characterPositions:allCharacters.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
@@ -540,7 +531,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         }
         
         // Check win condition after each character moves
-        const allInExitNow = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
+        const allInExitNow = encounterControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
         if (allInExitNow) {
           allInExitDuringMovement = true;
         }
@@ -616,7 +607,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     });
     
     // Check for win condition after executing movement
-    const allInExitAfterMovement = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
+    const allInExitAfterMovement = encounterControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
     
     if (allInExitAfterMovement) {
       // Show status message
@@ -751,8 +742,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     
     if (allComplete || !movementPlan.hasAnyPath()) {
       // Transition to skill phase
-      phaseManagerRef.current.transitionToSkill();
-      setPhase(phaseManagerRef.current.getCurrentPhase());
+      encounterControllerRef.current.transitionToSkill();
+      setPhase(encounterControllerRef.current.getCurrentPhase());
       updateSelectedCharacter(null);
       updateValidMoves([]);
     } else {
@@ -823,8 +814,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       movementSystem.moveCharacter(world, charId, originalPos);
     });
     updatePlannedActions([]);
-    phaseManagerRef.current.resetToMovement();
-    setPhase(phaseManagerRef.current.getCurrentPhase());
+    encounterControllerRef.current.resetToMovement();
+    setPhase(encounterControllerRef.current.getCurrentPhase());
     updateSelectedCharacter(null);
     updateSelectedObject(null);
     setTick(t => t + 1); // Trigger re-render
@@ -832,11 +823,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
   const handleExecuteActions = () => {
     // Execute all planned actions (or everyone waits if no actions planned)
-    phaseManagerRef.current.transitionToExecuting();
-    setPhase(phaseManagerRef.current.getCurrentPhase());
+    encounterControllerRef.current.transitionToExecuting();
+    setPhase(encounterControllerRef.current.getCurrentPhase());
     
-    // Execute actions using ActionExecutionSystem
-    const executionSummary = actionExecutionSystemRef.current.executeActions(
+    // Execute actions using EncounterController
+    const executionSummary = encounterControllerRef.current.executeActions(
       world,
       grid,
       plannedActions,
@@ -891,11 +882,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     // Reset after execution (only if win condition not met)
     setTimeout(() => {
       // Increment turn - a complete cycle (movement + skill + execution) has finished
-      turnSystemRef.current.incrementTurn();
-      setCurrentTurn(turnSystemRef.current.getCurrentTurn() + 1); // Update displayed turn
+      encounterControllerRef.current.incrementTurn();
+      setCurrentTurn(encounterControllerRef.current.getCurrentTurn() + 1); // Update displayed turn
       updatePlannedActions([]);
-      phaseManagerRef.current.resetToMovement();
-      setPhase(phaseManagerRef.current.getCurrentPhase());
+      encounterControllerRef.current.resetToMovement();
+      setPhase(encounterControllerRef.current.getCurrentPhase());
       updateSelectedCharacter(null);
       updateSelectedObject(null);
       // Update original positions for next turn
