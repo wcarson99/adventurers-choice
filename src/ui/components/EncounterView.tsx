@@ -6,6 +6,7 @@ import { MovementSystem } from '../../game-engine/encounters/MovementSystem';
 import { PushSystem } from '../../game-engine/encounters/PushSystem';
 import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
 import { TurnSystem } from '../../game-engine/encounters/TurnSystem';
+import { WinConditionSystem } from '../../game-engine/encounters/WinConditionSystem';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -40,6 +41,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
   const turnSystemRef = useRef<TurnSystem>(new TurnSystem());
+  const winConditionSystem = new WinConditionSystem();
   const [currentTurn, setCurrentTurn] = useState(1); // Track turn for React re-renders
 
   // Reset turn system when encounter changes
@@ -505,12 +507,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:509',message:'Win condition check - legacy execution path',data:{phase:'legacy_execution'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
-        const allCharacters = getPlayerCharacters();
-        const allInExit = allCharacters.every(charId => {
-          const pos = world.getComponent<PositionComponent>(charId, 'Position');
-          return pos && grid.isExitZone(pos.x, pos.y);
-        });
+        const allInExit = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
         // #region agent log
+        const allCharacters = getPlayerCharacters();
         fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:515',message:'Win condition result',data:{allInExit,characterCount:allCharacters.length,characterPositions:allCharacters.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
 
@@ -1059,11 +1058,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                         }
                         
                         // Check win condition after each character moves
-                        const allChars = getPlayerCharacters();
-                        const allInExitNow = allChars.every(charId => {
-                          const pos = world.getComponent<PositionComponent>(charId, 'Position');
-                          return pos ? grid.isExitZone(pos.x, pos.y) : false;
-                        });
+                        const allInExitNow = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
                         if (allInExitNow) {
                           allInExitDuringMovement = true;
                         }
@@ -1139,11 +1134,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                     });
                     
                     // Check for win condition after executing movement
-                    const allCharactersAfterMovement = getPlayerCharacters();
-                    const allInExitAfterMovement = allCharactersAfterMovement.every(charId => {
-                      const pos = world.getComponent<PositionComponent>(charId, 'Position');
-                      return pos ? grid.isExitZone(pos.x, pos.y) : false;
-                    });
+                    const allInExitAfterMovement = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
                     
                     if (allInExitAfterMovement) {
                       // Show status message
@@ -1615,12 +1606,9 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                     // #endregion
                     
                     // Check for win condition after executing actions
-                    const allCharactersAfterActions = getPlayerCharacters();
-                    const allInExitAfterActions = allCharactersAfterActions.every(charId => {
-                      const pos = world.getComponent<PositionComponent>(charId, 'Position');
-                      return pos && grid.isExitZone(pos.x, pos.y);
-                    });
+                    const allInExitAfterActions = winConditionSystem.checkWinCondition(world, grid, getPlayerCharacters);
                     // #region agent log
+                    const allCharactersAfterActions = getPlayerCharacters();
                     fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EncounterView.tsx:1560',message:'Win condition result after skill phase',data:{allInExit:allInExitAfterActions,characterCount:allCharactersAfterActions.length,characterPositions:allCharactersAfterActions.map(id=>{const p=world.getComponent<PositionComponent>(id,'Position');return p?{id,x:p.x,y:p.y,isExit:grid.isExitZone(p.x,p.y)}:null})},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
                     // #endregion
                     
