@@ -83,6 +83,7 @@ export function getEncounterTypeDisplayName(encounter: EncounterType): string {
       // Exhaustiveness check - TypeScript will error if we miss a case
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const _exhaustive: never = encounter;
+      void _exhaustive; // Suppress unused variable warning
       return 'Unknown';
   }
 }
@@ -99,6 +100,7 @@ export function getStatAbbreviation(attribute: StatRequirement['attribute']): st
   };
   return abbreviations[attribute];
 }
+
 
 
 

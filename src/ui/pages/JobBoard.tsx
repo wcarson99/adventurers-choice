@@ -61,7 +61,7 @@ const JobBoard: React.FC = () => {
     if (missionsListRef.current) {
       const el = missionsListRef.current;
       const styles = window.getComputedStyle(el);
-      const hasScrollbar = el.offsetWidth > el.clientWidth || el.scrollHeight > el.clientHeight;
+      // Removed unused hasScrollbar variable
       
       console.log('=== Scrollbar Verification ===');
       console.log('overflowY:', styles.overflowY);

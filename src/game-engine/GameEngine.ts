@@ -16,7 +16,7 @@ export class GameEngine {
    * @param action - The action to execute
    * @returns Updated game state after processing the action
    */
-  executeTurn(action: Action): GameState {
+  executeTurn(_action: Action): GameState {
     // Increment turn counter
     this.turn += 1;
     

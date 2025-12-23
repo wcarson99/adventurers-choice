@@ -2,11 +2,9 @@ import React, { useState, useRef } from 'react';
 import { useGame } from '../../game-engine/GameState';
 import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from '../../game-engine/ecs/Component';
 import { theme } from '../styles/theme';
-import { Grid } from '../../game-engine/grid/Grid';
 import { MovementSystem } from '../../game-engine/encounters/MovementSystem';
 import { PushSystem } from '../../game-engine/encounters/PushSystem';
 import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
-import { ConflictDetector } from '../../game-engine/encounters/ConflictDetector';
 import { TurnSystem } from '../../game-engine/encounters/TurnSystem';
 
 interface EncounterViewProps {
@@ -23,22 +21,22 @@ interface PlannedAction {
   cost: number;
 }
 
-export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onCompleteMission }) => {
+export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onCompleteMission: _onCompleteMission }) => {
   const { grid, world, completeMission, consumeFood, party, showStatus, activeCampaign, currentEncounterIndex } = useGame();
-  const [tick, setTick] = useState(0); // Force render
+  const [_tick, setTick] = useState(0); // Force render
   const [phase, setPhase] = useState<PlanningPhase>('movement');
   const [originalPositions, setOriginalPositions] = useState<Map<number, { x: number; y: number }>>(new Map());
   // Debug flag to show tile coordinates (set to true for testing)
   const [showTileCoordinates] = useState<boolean>(false);
   const [plannedActions, setPlannedActions] = useState<PlannedAction[]>([]);
-  const [actionOrder, setActionOrder] = useState<number[]>([]); // Character IDs in execution order
+  const [_actionOrder, _setActionOrder] = useState<number[]>([]); // Character IDs in execution order
   const [selectedCharacter, setSelectedCharacter] = useState<number | null>(null);
   const [validMoves, setValidMoves] = useState<Array<{ x: number; y: number }>>([]);
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
   const [validPushDirections, setValidPushDirections] = useState<Array<{ dx: number; dy: number; staminaCost: number }>>([]);
   const [movementPlan] = useState<MovementPlan>(() => new MovementPlan());
   const [pathUpdateTrigger, setPathUpdateTrigger] = useState(0); // Force re-render when paths change
-  const isCompletingRef = useRef(false); // Prevent multiple completion calls (use ref to avoid dependency issues)
+  // Removed unused isCompletingRef
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
   const turnSystemRef = useRef<TurnSystem>(new TurnSystem());
@@ -301,20 +299,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     }
   };
 
-  // Check if a move would result in overlapping characters
-  const wouldOverlap = (targetX: number, targetY: number, excludeCharacterId?: number): boolean => {
-    const entities = world.getAllEntities();
-    for (const id of entities) {
-      if (excludeCharacterId && id === excludeCharacterId) continue;
-      const attrs = world.getComponent<AttributesComponent>(id, 'Attributes');
-      if (!attrs) continue; // Only check characters
-      const pos = world.getComponent<PositionComponent>(id, 'Position');
-      if (pos && pos.x === targetX && pos.y === targetY) {
-        return true; // Overlap found
-      }
-    }
-    return false;
-  };
+  // Removed unused wouldOverlap function
 
   const handleTileClick = (x: number, y: number) => {
     // Movement phase: plan paths instead of moving immediately
@@ -533,7 +518,6 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           setTimeout(() => {
             // Check if this is a campaign or mission
             if (activeCampaign && currentEncounterIndex !== undefined) {
-              const encounter = activeCampaign.encounters[currentEncounterIndex];
               const isLastEncounter = currentEncounterIndex === activeCampaign.encounters.length - 1;
               if (isLastEncounter) {
                 showStatus("Campaign Complete! All encounters finished.", 'success', 3000);
@@ -986,7 +970,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
           }}>
             {movementPlan.hasAnyPath() && (() => {
               // Force recalculation when paths change (use pathUpdateTrigger)
-              const _ = pathUpdateTrigger;
+              void pathUpdateTrigger;
               
               // Check if there are any paths that can be executed (ready, executing, or conflicting)
               const allPaths = movementPlan.getAllPaths();
@@ -1314,7 +1298,7 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
         {/* Skill Action Planning Phase */}
         {phase === 'skill' && (() => {
-          const playerCharacters = getPlayerCharacters();
+          // Removed unused playerCharacters variable
           
           return (
             <>

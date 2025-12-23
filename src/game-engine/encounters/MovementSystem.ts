@@ -101,7 +101,7 @@ export class MovementSystem {
   /**
    * Check if a position is occupied by another character
    */
-  private isOccupied(world: World, grid: Grid, x: number, y: number, excludeId: number): boolean {
+  private isOccupied(world: World, _grid: Grid, x: number, y: number, excludeId: number): boolean {
     const entities = world.getAllEntities();
     
     for (const entityId of entities) {

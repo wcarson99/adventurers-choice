@@ -1,10 +1,9 @@
 import React from 'react';
 import { useGame } from '../../game-engine/GameState';
 import { EncounterView } from '../components/EncounterView';
-import { theme } from '../styles/theme';
 
 export const MissionView: React.FC = () => {
-  const { activeMission, completeMission, consumeFood, activeCampaign, currentEncounterIndex } = useGame();
+  const { activeMission, completeMission, consumeFood, activeCampaign, currentEncounterIndex: _currentEncounterIndex } = useGame();
 
   const handleComplete = () => {
     if (activeMission) {
