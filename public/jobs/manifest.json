@@ -1,0 +1,17 @@
+{
+  "jobs": [
+    {
+      "id": "push-test-job",
+      "name": "Push Test Job",
+      "description": "Test job for push mechanics - simple scenario with one crate",
+      "file": "push-test-job.json"
+    },
+    {
+      "id": "movement-test-job",
+      "name": "Movement Test Job",
+      "description": "Simple scenario for testing movement mechanics - minimal obstacles",
+      "file": "movement-test-job.json"
+    }
+  ]
+}
+

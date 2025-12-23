@@ -1,6 +1,6 @@
 import type { Action } from '@/types/Action';
 import type { GameState } from '@/types/GameState';
-import type { EncounterType } from '@/types/Encounter';
+import type { ScenarioType } from '@/types/Scenario';
 
 /**
  * Base class for all mini games (Combat, Obstacles, Trading, Statecraft, etc.)
@@ -15,21 +15,23 @@ import type { EncounterType } from '@/types/Encounter';
  * where GameEngine.executeTurn(action) is the single entry point.
  */
 export abstract class BaseMiniGame {
-  protected encounterType: EncounterType;
+  protected scenarioType: ScenarioType;
   protected isInitialized: boolean = false;
   protected isComplete: boolean = false;
   protected isWon: boolean = false;
   protected isLost: boolean = false;
 
-  constructor(encounterType: EncounterType) {
-    this.encounterType = encounterType;
+  constructor(scenarioType: ScenarioType) {
+    this.scenarioType = scenarioType;
   }
 
   /**
    * Initialize the mini game
    * Called when the mini game starts
+   * 
+   * @param config - Configuration data for the scenario (optional)
    */
-  abstract initialize(): void;
+  abstract initialize(config?: unknown): void;
 
   /**
    * Execute an action in the mini game
@@ -67,10 +69,10 @@ export abstract class BaseMiniGame {
   abstract cleanup(): void;
 
   /**
-   * Get the encounter type for this mini game
+   * Get the scenario type for this mini game
    */
-  getEncounterType(): EncounterType {
-    return this.encounterType;
+  getScenarioType(): ScenarioType {
+    return this.scenarioType;
   }
 
   /**

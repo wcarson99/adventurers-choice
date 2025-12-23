@@ -4,8 +4,8 @@ import { PositionComponent, RenderableComponent, AttributesComponent, PushableCo
 import { theme } from '../styles/theme';
 import { ValidMove } from '../../game-engine/encounters/EncounterStateManager';
 import { GridController } from '../../game-engine/encounters/GridController';
-import { EncounterGrid } from './encounter/EncounterGrid';
-import { EncounterInfoPanel } from './encounter/EncounterInfoPanel';
+import { ScenarioGrid } from './scenario/ScenarioGrid';
+import { ScenarioInfoPanel } from './scenario/ScenarioInfoPanel';
 
 interface ScenarioViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -389,14 +389,14 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       showStatus('Round complete! Starting next round...', 'success');
       
       // Auto-select first character of new round
-      const nextActiveChar = encounterControllerRef.current.getCurrentActiveCharacter();
+      const nextActiveChar = gridControllerRef.current.getCurrentActiveCharacter();
       if (nextActiveChar !== null && grid) {
         updateSelectedCharacter(nextActiveChar);
         const attrs = world.getComponent<AttributesComponent>(nextActiveChar, 'Attributes');
         const pos = world.getComponent<PositionComponent>(nextActiveChar, 'Position');
         
         // Check if character can afford Move (15 AP)
-        const canAffordMove = encounterControllerRef.current.canAffordAction(nextActiveChar, 'Move');
+        const canAffordMove = gridControllerRef.current.canAffordAction(nextActiveChar, 'Move');
         
         if (canAffordMove && attrs && pos) {
           // Default to Move: calculate and show valid moves
@@ -412,14 +412,14 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       }
     } else {
       // Next character's turn - auto-select and default to Move or Pass
-      const nextCharacter = encounterControllerRef.current.getCurrentActiveCharacter();
+      const nextCharacter = gridControllerRef.current.getCurrentActiveCharacter();
       if (nextCharacter !== null && grid) {
         updateSelectedCharacter(nextCharacter);
         const attrs = world.getComponent<AttributesComponent>(nextCharacter, 'Attributes');
         const pos = world.getComponent<PositionComponent>(nextCharacter, 'Position');
         
         // Check if character can afford Move (15 AP)
-        const canAffordMove = encounterControllerRef.current.canAffordAction(nextCharacter, 'Move');
+        const canAffordMove = gridControllerRef.current.canAffordAction(nextCharacter, 'Move');
         
         if (canAffordMove && attrs && pos) {
           // Default to Move: calculate and show valid moves
@@ -466,7 +466,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     }
 
     if (actionName === 'Push' && targetId) {
-      const result = encounterControllerRef.current.executeActionImmediate(
+      const result = gridControllerRef.current.executeActionImmediate(
         world,
         grid,
         'Push',
@@ -480,7 +480,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
         setTick(t => t + 1);
 
         // Check win condition
-        const allInExit = encounterControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
+        const allInExit = gridControllerRef.current.checkWinCondition(world, grid, getPlayerCharacters);
         if (allInExit) {
           handleWinCondition();
           return;
@@ -503,7 +503,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       return;
     }
 
-    const result = encounterControllerRef.current.executeActionImmediate(
+    const result = gridControllerRef.current.executeActionImmediate(
       world,
       grid,
       'Turn',
@@ -533,7 +533,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       overflow: 'hidden'
     }}>
       {/* Grid Section - Left Side: 800px × 800px */}
-      <EncounterGrid
+      <ScenarioGrid
         grid={grid}
         world={world}
         phase={'executing' as any} // @deprecated - kept for backward compatibility
@@ -547,7 +547,7 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       />
 
       {/* Info Panel - Right Side: 480px × 800px */}
-      <EncounterInfoPanel
+      <ScenarioInfoPanel
         phase={'executing' as any} // @deprecated - kept for backward compatibility
         currentTurn={currentRound}
         activeMission={activeMission}

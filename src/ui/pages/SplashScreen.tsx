@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useGame } from '../../game-engine/GameState';
 import { theme } from '../styles/theme';
-import { CampaignLoader } from '../../campaigns/CampaignLoader';
-import type { CampaignManifestEntry } from '../../campaigns/Campaign';
+import { JobLoader } from '../../jobs/JobLoader';
+import type { JobManifestEntry } from '../../jobs/Job';
 
 const SplashScreen: React.FC = () => {
-  const { setView, prepareCampaignCharacters } = useGame();
-  const [campaigns, setCampaigns] = useState<CampaignManifestEntry[]>([]);
+  const { setView, prepareJobCharacters } = useGame();
+  const [jobs, setJobs] = useState<JobManifestEntry[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>('random');
   const [loading, setLoading] = useState(false);
 
-  // Load available campaigns on mount
+  // Load available jobs on mount
   useEffect(() => {
-    CampaignLoader.getAvailableCampaigns()
-      .then(setCampaigns)
+    JobLoader.getAvailableJobs()
+      .then(setJobs)
       .catch(error => {
-        console.error('Failed to load campaigns:', error);
-        setCampaigns([]);
+        console.error('Failed to load jobs:', error);
+        setJobs([]);
       });
   }, []);
 
@@ -25,13 +25,13 @@ const SplashScreen: React.FC = () => {
       // Random mode - go to character creation with default characters
       setView('CHARACTER_CREATION');
     } else if (selectedOption && selectedOption !== 'random') {
-      // Campaign selected - prepare characters and go to character creation
+      // Job selected - prepare characters and go to character creation
       setLoading(true);
       try {
-        await prepareCampaignCharacters(selectedOption);
+        await prepareJobCharacters(selectedOption);
         setView('CHARACTER_CREATION');
       } catch (error) {
-        console.error('Failed to prepare campaign:', error);
+        console.error('Failed to prepare job:', error);
       } finally {
         setLoading(false);
       }
@@ -104,9 +104,9 @@ const SplashScreen: React.FC = () => {
             }}
           >
             <option value="random">Random</option>
-            {campaigns.map(campaign => (
-              <option key={campaign.id} value={campaign.id}>
-                {campaign.name}
+            {jobs.map(job => (
+              <option key={job.id} value={job.id}>
+                {job.name}
               </option>
             ))}
           </select>

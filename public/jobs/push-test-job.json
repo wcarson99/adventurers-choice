@@ -1,0 +1,51 @@
+{
+  "id": "push-test-job",
+  "name": "Push Test Job",
+  "description": "Test job for push mechanics - simple scenario with one crate",
+  "scenarios": [
+    {
+      "id": "push-test-scenario",
+      "name": "Push Test Scenario",
+      "description": "Simple scenario with one crate to push",
+      "minigameType": "obstacle",
+      "grid": {
+        "width": 10,
+        "height": 10
+      },
+      "entities": [
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 1 },
+          "properties": {
+            "name": "Hero 1",
+            "archetype": "Warrior",
+            "attributes": {
+              "pwr": 5,
+              "mov": 2,
+              "inf": 2,
+              "cre": 2
+            },
+            "sprite": "/assets/characters/warrior.png",
+            "gold": 20,
+            "food": 4
+          }
+        },
+        {
+          "type": "crate",
+          "position": { "x": 2, "y": 2 },
+          "properties": {
+            "weight": 30,
+            "sprite": "/assets/items/crate.png"
+          }
+        }
+      ],
+      "winConditions": [
+        {
+          "type": "allCharactersInExit",
+          "description": "All characters must reach the exit zone"
+        }
+      ]
+    }
+  ]
+}
+

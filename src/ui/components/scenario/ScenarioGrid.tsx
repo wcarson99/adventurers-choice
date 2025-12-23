@@ -7,7 +7,7 @@ import { PlanningPhase } from '../../../game-engine/encounters/EncounterPhaseMan
 import { ValidMove, ValidPushDirection } from '../../../game-engine/encounters/EncounterStateManager';
 import { theme } from '../../styles/theme';
 
-interface EncounterGridProps {
+interface ScenarioGridProps {
   grid: Grid;
   world: World;
   phase: PlanningPhase;
@@ -21,7 +21,7 @@ interface EncounterGridProps {
   selectingDirection?: boolean;
 }
 
-export const EncounterGrid: React.FC<EncounterGridProps> = ({
+export const ScenarioGrid: React.FC<ScenarioGridProps> = ({
   grid,
   world,
   phase,

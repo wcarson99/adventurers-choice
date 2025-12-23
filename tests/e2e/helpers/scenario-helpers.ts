@@ -1,9 +1,9 @@
 import { Page, Locator } from '@playwright/test';
 
 /**
- * Helper functions for encounter/grid interactions
+ * Helper functions for scenario/grid interactions
  */
-export class EncounterHelpers {
+export class ScenarioHelpers {
   constructor(private page: Page) {}
 
   /**

@@ -6,12 +6,12 @@ import { PlanningPhase } from '../../../game-engine/encounters/EncounterPhaseMan
 import { PlannedAction } from '../../../game-engine/encounters/EncounterStateManager';
 import { theme } from '../../styles/theme';
 
-interface EncounterInfoPanelProps {
+interface ScenarioInfoPanelProps {
   phase: PlanningPhase; // @deprecated - kept for backward compatibility
   currentTurn: number; // Now represents round number
   activeMission?: { title: string; description: string; days?: number };
-  activeCampaign?: { name: string; encounters: Array<{ name: string; description: string }> };
-  currentEncounterIndex?: number;
+  activeJob?: { name: string; scenarios: Array<{ name: string; description: string }> };
+  currentScenarioIndex?: number;
   selectedCharacter: number | null;
   selectedObject: number | null;
   plannedActions: PlannedAction[]; // @deprecated - no longer used
@@ -46,16 +46,16 @@ interface EncounterInfoPanelProps {
 // Runtime check: This will fail if old code tries to import this module
 // VERSION 2.1.0 - Force module reload
 if (typeof window !== 'undefined') {
-  (window as any).__ENCOUNTER_INFO_PANEL_V2__ = true;
-  (window as any).__ENCOUNTER_INFO_PANEL_VERSION__ = '2.1.0';
+  (window as any).__SCENARIO_INFO_PANEL_V2__ = true;
+  (window as any).__SCENARIO_INFO_PANEL_VERSION__ = '2.1.0';
 }
 
-export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
+export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
   phase: _phase, // @deprecated
   currentTurn,
   activeMission,
-  activeCampaign,
-  currentEncounterIndex,
+  activeJob,
+  currentScenarioIndex,
   selectedCharacter,
   selectedObject,
   plannedActions: _plannedActions, // @deprecated
@@ -85,21 +85,21 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
   onDirectionSelect: _onDirectionSelect,
 }) => {
   // CRITICAL CHECK: Verify new code is running
-  if (typeof window !== 'undefined' && !(window as any).__ENCOUNTER_INFO_PANEL_V2__) {
-    console.error('[EncounterInfoPanel] FATAL: Old code detected! Module not properly loaded.');
-    throw new Error('Old EncounterInfoPanel code detected - browser cache issue');
+  if (typeof window !== 'undefined' && !(window as any).__SCENARIO_INFO_PANEL_V2__) {
+    console.error('[ScenarioInfoPanel] FATAL: Old code detected! Module not properly loaded.');
+    throw new Error('Old ScenarioInfoPanel code detected - browser cache issue');
   }
   
   const AP_SYSTEM_VERSION = '2.0.0';
-  console.log(`[EncounterInfoPanel] ✅ AP System ${AP_SYSTEM_VERSION} LOADED - New code is running!`);
+  console.log(`[ScenarioInfoPanel] ✅ AP System ${AP_SYSTEM_VERSION} LOADED - New code is running!`);
   
   const currentActiveCharacter = getCurrentActiveCharacter ? getCurrentActiveCharacter() : null;
   
   // Debug logging
   React.useEffect(() => {
-    console.log('[EncounterInfoPanel] Component mounted, currentActiveCharacter:', currentActiveCharacter);
+      console.log('[ScenarioInfoPanel] Component mounted, currentActiveCharacter:', currentActiveCharacter);
     if (currentActiveCharacter === null && getCurrentActiveCharacter) {
-      console.log('[EncounterInfoPanel] WARNING: currentActiveCharacter is null - round may not be initialized');
+      console.log('[ScenarioInfoPanel] WARNING: currentActiveCharacter is null - round may not be initialized');
     } else if (currentActiveCharacter !== null) {
       console.log('[EncounterInfoPanel] currentActiveCharacter:', currentActiveCharacter);
     }
@@ -118,7 +118,7 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
       boxShadow: '-4px 0 6px rgba(0,0,0,0.3)'
     }}>
       {/* Mission/Campaign Title - Compact */}
-      {(activeMission || (activeCampaign && currentEncounterIndex !== undefined)) && (
+      {(activeMission || (activeJob && currentScenarioIndex !== undefined)) && (
         <div style={{
           marginBottom: '0.75rem',
           paddingBottom: '0.75rem',
@@ -132,8 +132,8 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
           }}>
             {activeMission 
               ? activeMission.title 
-              : activeCampaign && currentEncounterIndex !== undefined
-                ? `${activeCampaign.name} - ${activeCampaign.encounters[currentEncounterIndex].name}`
+              : activeJob && currentScenarioIndex !== undefined
+                ? `${activeJob.name} - ${activeJob.scenarios[currentScenarioIndex].name}`
                 : ''}
           </h2>
           <p style={{ 
@@ -145,11 +145,11 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
           }}>
             {activeMission 
               ? activeMission.description 
-              : activeCampaign && currentEncounterIndex !== undefined
-                ? activeCampaign.encounters[currentEncounterIndex].description
+              : activeJob && currentScenarioIndex !== undefined
+                ? activeJob.scenarios[currentScenarioIndex].description
                 : ''}
           </p>
-          {activeCampaign && currentEncounterIndex !== undefined && (
+          {activeJob && currentScenarioIndex !== undefined && (
             <p style={{ 
               fontSize: '0.7rem', 
               margin: '0.25rem 0 0 0', 
@@ -157,7 +157,7 @@ export const EncounterInfoPanel: React.FC<EncounterInfoPanelProps> = ({
               opacity: 0.7,
               fontStyle: 'italic'
             }}>
-              Encounter {currentEncounterIndex + 1} of {activeCampaign.encounters.length}
+              Scenario {currentScenarioIndex + 1} of {activeJob.scenarios.length}
             </p>
           )}
         </div>

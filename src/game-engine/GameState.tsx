@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { theme } from '../ui/styles/theme';
-import type { EncounterType } from '../types/Encounter';
+import type { ScenarioType } from '../types/Scenario';
 
 // Define the possible views in the game loop
 export type GameView =
@@ -19,7 +19,7 @@ export interface Mission {
   days: number;
   rewardGold: number;
   rewardAp: number;
-  encounterType: EncounterType;
+  encounterType: ScenarioType;
 }
 
 export interface Attributes {
@@ -42,9 +42,9 @@ export interface Character {
 import { World } from './ecs/World';
 import { Grid } from './grid/Grid';
 import { PositionComponent, RenderableComponent, AttributesComponent, PushableComponent } from './ecs/Component';
-import type { Campaign } from '../campaigns/Campaign';
-import { CampaignLoader } from '../campaigns/CampaignLoader';
-import { EncounterFactory } from '../encounters/EncounterFactory';
+import type { Job } from '../jobs/Job';
+import { JobLoader } from '../jobs/JobLoader';
+import { ScenarioFactory } from '../scenarios/ScenarioFactory';
 
 // Define the Game State interface
 interface GameState {
@@ -54,10 +54,10 @@ interface GameState {
   party: Character[];
   world?: World;
   grid?: Grid;
-  // Campaign support
+  // Job support
   gameMode?: 'roguelike' | 'campaign';
-  activeCampaign?: Campaign;
-  currentEncounterIndex?: number;
+  activeJob?: Job;
+  currentScenarioIndex?: number;
 }
 
 export type StatusMessageType = 'error' | 'success' | 'info';
@@ -80,10 +80,10 @@ interface GameContextType extends GameState {
   getTotalGold: () => number;
   getTotalFood: () => number;
   consumeFood: (amount: number) => void;
-  // Campaign support
-  prepareCampaignCharacters: (campaignId: string) => Promise<void>;
-  startCampaign: (campaignId: string, encounterIndex?: number) => Promise<void>;
-  nextEncounter: () => void;
+  // Job support
+  prepareJobCharacters: (jobId: string) => Promise<void>;
+  startJob: (jobId: string, scenarioIndex?: number) => Promise<void>;
+  nextScenario: () => void;
   // Status message
   statusMessage: StatusMessage | null;
   setStatusMessage: (message: StatusMessage | null) => void;
@@ -183,41 +183,41 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const completeMission = () => {
     setState(prev => {
-      // Handle campaign encounter completion
-      // Check for campaign mode OR if we have an activeCampaign (fallback for state issues)
-      if ((prev.gameMode === 'campaign' || prev.activeCampaign) && prev.activeCampaign && prev.currentEncounterIndex !== undefined) {
-        console.log('🟡 Handling campaign completion', {
-          encounterIndex: prev.currentEncounterIndex,
-          totalEncounters: prev.activeCampaign.encounters.length
+      // Handle job scenario completion
+      // Check for campaign mode OR if we have an activeJob (fallback for state issues)
+      if ((prev.gameMode === 'campaign' || prev.activeJob) && prev.activeJob && prev.currentScenarioIndex !== undefined) {
+        console.log('🟡 Handling job completion', {
+          scenarioIndex: prev.currentScenarioIndex,
+          totalScenarios: prev.activeJob.scenarios.length
         });
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GameState.tsx:192',message:'Handling campaign completion',data:{encounterIndex:prev.currentEncounterIndex,totalEncounters:prev.activeCampaign.encounters.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7243/ingest/a8076b67-7120-45c4-b321-06759ddc4b1d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GameState.tsx:192',message:'Handling job completion',data:{scenarioIndex:prev.currentScenarioIndex,totalScenarios:prev.activeJob.scenarios.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
         // #endregion
-        const encounterIndex = prev.currentEncounterIndex;
-        const totalEncounters = prev.activeCampaign.encounters.length;
+        const scenarioIndex = prev.currentScenarioIndex;
+        const totalScenarios = prev.activeJob.scenarios.length;
         
-        // Check if there are more encounters
-        if (encounterIndex < totalEncounters - 1) {
-          // Load next encounter immediately
-          const nextIndex = encounterIndex + 1;
-          const encounter = prev.activeCampaign.encounters[nextIndex];
-          const { world, grid, party } = EncounterFactory.createFromDefinition(encounter);
+        // Check if there are more scenarios
+        if (scenarioIndex < totalScenarios - 1) {
+          // Load next scenario immediately
+          const nextIndex = scenarioIndex + 1;
+          const scenario = prev.activeJob.scenarios[nextIndex];
+          const { world, grid, party } = ScenarioFactory.createFromScenario(scenario);
           
           return {
             ...prev,
-            currentEncounterIndex: nextIndex,
+            currentScenarioIndex: nextIndex,
             party: party, // Update party (in case characters changed)
             world,
             grid,
             // Stay in MISSION view
           };
         } else {
-          // Campaign complete
-          showStatus('Campaign Complete!', 'success', 3000);
+          // Job complete
+          showStatus('Job Complete!', 'success', 3000);
           return {
             ...prev,
-            activeCampaign: undefined,
-            currentEncounterIndex: undefined,
+            activeJob: undefined,
+            currentScenarioIndex: undefined,
             gameMode: undefined,
             currentView: 'SPLASH',
             world: undefined,
@@ -243,79 +243,79 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
-  const prepareCampaignCharacters = async (campaignId: string) => {
+  const prepareJobCharacters = async (jobId: string) => {
     try {
-      // Load campaign
-      const campaign = await CampaignLoader.loadCampaign(campaignId);
+      // Load job
+      const job = await JobLoader.loadJob(jobId);
       
-      // Get first encounter to extract characters
-      const encounter = campaign.encounters[0];
+      // Get first scenario to extract characters
+      const scenario = job.scenarios[0];
       
-      // Create party from encounter (but don't create world/grid yet)
-      const { party } = EncounterFactory.createFromDefinition(encounter);
+      // Create party from scenario (but don't create world/grid yet)
+      const { party } = ScenarioFactory.createFromScenario(scenario);
 
       setState(prev => ({
         ...prev,
         gameMode: 'campaign',
-        activeCampaign: campaign,
-        currentEncounterIndex: 0,
-        party: party, // Set party from campaign for character creation screen
+        activeJob: job,
+        currentScenarioIndex: 0,
+        party: party, // Set party from job for character creation screen
         // Don't set world/grid yet - wait until they click "Embark"
         activeMission: undefined, // Clear any active mission
       }));
     } catch (error) {
-      console.error('Failed to prepare campaign:', error);
-      showStatus(`Failed to load campaign: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      console.error('Failed to prepare job:', error);
+      showStatus(`Failed to load job: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       throw error;
     }
   };
 
-  const startCampaign = async (campaignId: string, encounterIndex: number = 0) => {
+  const startJob = async (jobId: string, scenarioIndex: number = 0) => {
     try {
-      // Load campaign
-      const campaign = await CampaignLoader.loadCampaign(campaignId);
+      // Load job
+      const job = await JobLoader.loadJob(jobId);
       
-      // Validate encounter index
-      if (encounterIndex < 0 || encounterIndex >= campaign.encounters.length) {
-        throw new Error(`Invalid encounter index: ${encounterIndex}`);
+      // Validate scenario index
+      if (scenarioIndex < 0 || scenarioIndex >= job.scenarios.length) {
+        throw new Error(`Invalid scenario index: ${scenarioIndex}`);
       }
 
-      // Get encounter definition
-      const encounter = campaign.encounters[encounterIndex];
+      // Get scenario definition
+      const scenario = job.scenarios[scenarioIndex];
       
-      // Create world, grid, and party from encounter
-      const { world, grid, party } = EncounterFactory.createFromDefinition(encounter);
+      // Create world, grid, and party from scenario
+      const { world, grid, party } = ScenarioFactory.createFromScenario(scenario);
 
       setState(prev => ({
         ...prev,
         gameMode: 'campaign',
-        activeCampaign: campaign,
-        currentEncounterIndex: encounterIndex,
-        party: party, // Set party from campaign
+        activeJob: job,
+        currentScenarioIndex: scenarioIndex,
+        party: party, // Set party from job
         world,
         grid,
         currentView: 'MISSION',
         activeMission: undefined, // Clear any active mission
       }));
     } catch (error) {
-      console.error('Failed to start campaign:', error);
-      showStatus(`Failed to load campaign: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      console.error('Failed to start job:', error);
+      showStatus(`Failed to load job: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   };
 
-  const nextEncounter = () => {
+  const nextScenario = () => {
     setState(prev => {
-      if (prev.gameMode !== 'campaign' || !prev.activeCampaign || prev.currentEncounterIndex === undefined) {
+      if (prev.gameMode !== 'campaign' || !prev.activeJob || prev.currentScenarioIndex === undefined) {
         return prev;
       }
 
-      const nextIndex = prev.currentEncounterIndex + 1;
-      if (nextIndex >= prev.activeCampaign.encounters.length) {
-        // Campaign complete
+      const nextIndex = prev.currentScenarioIndex + 1;
+      if (nextIndex >= prev.activeJob.scenarios.length) {
+        // Job complete
         return {
           ...prev,
-          activeCampaign: undefined,
-          currentEncounterIndex: undefined,
+          activeJob: undefined,
+          currentScenarioIndex: undefined,
           gameMode: undefined,
           currentView: 'SPLASH',
           world: undefined,
@@ -323,13 +323,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
       }
 
-      // Load next encounter
-      const encounter = prev.activeCampaign.encounters[nextIndex];
-      const { world, grid, party } = EncounterFactory.createFromDefinition(encounter);
+      // Load next scenario
+      const scenario = prev.activeJob.scenarios[nextIndex];
+      const { world, grid, party } = ScenarioFactory.createFromScenario(scenario);
 
       return {
         ...prev,
-        currentEncounterIndex: nextIndex,
+        currentScenarioIndex: nextIndex,
         party: party, // Update party (in case characters changed)
         world,
         grid,
@@ -390,9 +390,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       getTotalGold,
       getTotalFood,
       consumeFood,
-      prepareCampaignCharacters,
-      startCampaign,
-      nextEncounter,
+      prepareJobCharacters,
+      startJob,
+      nextScenario,
       statusMessage,
       setStatusMessage,
       showStatus

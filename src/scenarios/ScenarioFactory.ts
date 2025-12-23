@@ -7,27 +7,27 @@ import {
   PushableComponent,
   DirectionComponent,
 } from '../game-engine/ecs/Component';
-import type { EncounterDefinition, EntityPlacement } from '../campaigns/Campaign';
+import type { ScenarioDefinition, EntityPlacement } from '../jobs/Job';
 import type { Character } from '../game-engine/GameState';
 import { theme } from '../ui/styles/theme';
 
 /**
- * Factory for creating ECS World and Grid from campaign encounter definitions
+ * Factory for creating ECS World and Grid from job scenario definitions
  */
-export class EncounterFactory {
+export class ScenarioFactory {
   /**
-   * Create World and Grid from an encounter definition
-   * Returns the world, grid, and party (characters from the encounter)
+   * Create World and Grid from a scenario definition
+   * Returns the world, grid, and party (characters from the scenario)
    */
-  static createFromDefinition(
-    encounter: EncounterDefinition
+  static createFromScenario(
+    scenario: ScenarioDefinition
   ): { world: World; grid: Grid; party: Character[] } {
     const world = new World();
-    const grid = new Grid(encounter.grid.width, encounter.grid.height);
+    const grid = new Grid(scenario.grid.width, scenario.grid.height);
     const party: Character[] = [];
 
     // Process entities in order
-    encounter.entities.forEach((entity, index) => {
+    scenario.entities.forEach((entity, index) => {
       const entityId = world.createEntity();
 
       // Add position component
@@ -59,7 +59,7 @@ export class EncounterFactory {
   }
 
   /**
-   * Create a character entity from campaign definition
+   * Create a character entity from job definition
    */
   private static createCharacter(
     world: World,
@@ -115,7 +115,7 @@ export class EncounterFactory {
   }
 
   /**
-   * Create a crate entity from campaign definition
+   * Create a crate entity from job definition
    */
   private static createCrate(
     world: World,

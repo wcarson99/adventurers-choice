@@ -168,7 +168,7 @@ const CharacterCard: React.FC<{
 };
 
 const CharacterCreation: React.FC = () => {
-  const { setView, setParty, party, gameMode, activeCampaign, startCampaign } = useGame();
+  const { setView, setParty, party, gameMode, activeJob, startJob } = useGame();
   const [characters, setCharacters] = useState<Character[]>([]);
 
   // Initialize characters on mount
@@ -217,8 +217,8 @@ const CharacterCreation: React.FC = () => {
     setParty(characters);
     
     // If this is a campaign, start the first encounter
-    if (gameMode === 'campaign' && activeCampaign) {
-      await startCampaign(activeCampaign.id, 0);
+    if (gameMode === 'campaign' && activeJob) {
+      await startJob(activeJob.id, 0);
     } else {
       // Otherwise go to town (roguelike mode)
       setView('TOWN');

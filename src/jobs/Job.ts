@@ -1,22 +1,24 @@
 /**
- * Campaign type definitions
+ * Job type definitions
  */
 
-export interface Campaign {
+export interface Job {
   id: string;
   name: string;
   description: string;
-  encounters: EncounterDefinition[];
+  scenarios: ScenarioDefinition[];
 }
 
-export interface EncounterDefinition {
+export interface ScenarioDefinition {
   id: string;
   name: string;
   description: string;
   testInstructions?: string; // For AI testers
+  minigameType: 'combat' | 'obstacle' | 'trading';
   grid: GridConfig;
   entities: EntityPlacement[];
   winConditions: WinCondition[];
+  config?: unknown; // Scenario-specific configuration (e.g., maxTurns for obstacle scenarios)
 }
 
 export interface GridConfig {
@@ -57,16 +59,16 @@ export interface WinCondition {
 }
 
 /**
- * Manifest file structure for campaign discovery
+ * Manifest file structure for job discovery
  */
-export interface CampaignManifest {
-  campaigns: CampaignManifestEntry[];
+export interface JobManifest {
+  jobs: JobManifestEntry[];
 }
 
-export interface CampaignManifestEntry {
+export interface JobManifestEntry {
   id: string;
   name: string;
   description: string;
-  file: string; // Relative path to campaign JSON file
+  file: string; // Relative path to job JSON file
 }
 

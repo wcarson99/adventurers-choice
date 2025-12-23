@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { EncounterHelpers } from '../helpers/encounter-helpers';
+import { ScenarioHelpers } from '../helpers/scenario-helpers';
 
-test.describe('Encounter Completion (Win Condition)', () => {
-  let encounter: EncounterHelpers;
+test.describe('Scenario Completion (Win Condition)', () => {
+  let scenario: ScenarioHelpers;
 
   test.beforeEach(async ({ page }) => {
-    encounter = new EncounterHelpers(page);
+    scenario = new ScenarioHelpers(page);
     
     // Navigate to splash screen
     await page.goto('/', { waitUntil: 'networkidle' });
@@ -14,8 +14,8 @@ test.describe('Encounter Completion (Win Condition)', () => {
     const gameSelect = page.locator('select').first();
     await gameSelect.waitFor({ state: 'visible', timeout: 10000 });
     
-    // Select movement-test-campaign
-    await gameSelect.selectOption('movement-test-campaign');
+    // Select movement-test-job
+    await gameSelect.selectOption('movement-test-job');
     
     // Click Start Adventure button
     const startButton = page.getByRole('button', { name: /Start Adventure/i });
@@ -30,8 +30,8 @@ test.describe('Encounter Completion (Win Condition)', () => {
     await embarkButton.waitFor({ state: 'visible', timeout: 5000 });
     await embarkButton.click();
     
-    // Wait for encounter grid to appear
-    await encounter.getTile(0, 0).waitFor({ state: 'visible', timeout: 15000 });
+    // Wait for scenario grid to appear
+    await scenario.getTile(0, 0).waitFor({ state: 'visible', timeout: 15000 });
   });
 
   test('win condition check logs are created after movement execution', async ({ page }) => {
@@ -44,9 +44,9 @@ test.describe('Encounter Completion (Win Condition)', () => {
     });
     
     // Move one character closer to exit zone
-    await encounter.clickTile(0, 1); // Select warrior
+    await scenario.clickTile(0, 1); // Select warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // Plan move right
+    await scenario.clickTile(1, 1); // Plan move right
     await page.waitForTimeout(300);
     
     // Execute the move
@@ -64,7 +64,7 @@ test.describe('Encounter Completion (Win Condition)', () => {
     
     // Verify logs were created (if fetch succeeded)
     // Note: The fetch might fail silently, so we check if character moved instead
-    const charMoved = await encounter.getEntityAtTile(1, 1);
+    const charMoved = await scenario.getEntityAtTile(1, 1);
     expect(charMoved).not.toBeNull();
   });
 });

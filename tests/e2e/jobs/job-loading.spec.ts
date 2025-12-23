@@ -1,15 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { EncounterHelpers } from '../helpers/encounter-helpers';
+import { ScenarioHelpers } from '../helpers/scenario-helpers';
 
-test.describe('Campaign Loading', () => {
-  let encounter: EncounterHelpers;
+test.describe('Job Loading', () => {
+  let scenario: ScenarioHelpers;
 
   test.beforeEach(async ({ page }) => {
-    encounter = new EncounterHelpers(page);
+    scenario = new ScenarioHelpers(page);
     await page.goto('/');
   });
 
-  test('game selection dropdown shows Random and available campaigns', async ({ page }) => {
+  test('game selection dropdown shows Random and available jobs', async ({ page }) => {
     // Step 1: Verify dropdown exists
     const gameSelect = page.locator('select').first();
     await expect(gameSelect).toBeVisible();
@@ -17,11 +17,11 @@ test.describe('Campaign Loading', () => {
     // Step 2: Verify Random is the default option
     await expect(gameSelect).toHaveValue('random');
 
-    // Step 3: Verify campaigns are listed
+    // Step 3: Verify jobs are listed
     const options = gameSelect.locator('option');
     const optionCount = await options.count();
     
-    // Should have at least "Random" + campaigns
+    // Should have at least "Random" + jobs
     expect(optionCount).toBeGreaterThan(1);
 
     // Step 4: Verify Random option exists
@@ -29,15 +29,15 @@ test.describe('Campaign Loading', () => {
     await expect(randomOption).toHaveCount(1);
     await expect(randomOption).toHaveText(/Random/i);
     
-    // Step 5: Verify push-test-campaign is in the list
-    const pushOption = gameSelect.locator('option[value="push-test-campaign"]');
+    // Step 5: Verify push-test-job is in the list
+    const pushOption = gameSelect.locator('option[value="push-test-job"]');
     await expect(pushOption).toHaveCount(1);
-    await expect(pushOption).toHaveText(/Push Test Campaign/i);
+    await expect(pushOption).toHaveText(/Push Test Job/i);
     
-    // Step 6: Verify movement-test-campaign is in the list
-    const movementOption = gameSelect.locator('option[value="movement-test-campaign"]');
+    // Step 6: Verify movement-test-job is in the list
+    const movementOption = gameSelect.locator('option[value="movement-test-job"]');
     await expect(movementOption).toHaveCount(1);
-    await expect(movementOption).toHaveText(/Movement Test Campaign/i);
+    await expect(movementOption).toHaveText(/Movement Test Job/i);
   });
 
 });

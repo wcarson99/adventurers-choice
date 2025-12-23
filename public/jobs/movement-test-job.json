@@ -1,0 +1,60 @@
+{
+  "id": "movement-test-job",
+  "name": "Movement Test Job",
+  "description": "Simple scenario for testing movement mechanics - minimal obstacles",
+  "scenarios": [
+    {
+      "id": "movement-test-scenario",
+      "name": "Movement Test Scenario",
+      "description": "Open grid for testing character movement",
+      "minigameType": "obstacle",
+      "grid": {
+        "width": 10,
+        "height": 10
+      },
+      "entities": [
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 1 },
+          "properties": {
+            "name": "Hero 1",
+            "archetype": "Warrior",
+            "attributes": {
+              "pwr": 5,
+              "mov": 2,
+              "inf": 2,
+              "cre": 2
+            },
+            "sprite": "/assets/characters/warrior.png",
+            "gold": 20,
+            "food": 4
+          }
+        },
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 2 },
+          "properties": {
+            "name": "Hero 2",
+            "archetype": "Thief",
+            "attributes": {
+              "pwr": 5,
+              "mov": 5,
+              "inf": 2,
+              "cre": 2
+            },
+            "sprite": "/assets/characters/thief.png",
+            "gold": 20,
+            "food": 4
+          }
+        }
+      ],
+      "winConditions": [
+        {
+          "type": "allCharactersInExit",
+          "description": "All characters must reach the exit zone"
+        }
+      ]
+    }
+  ]
+}
+

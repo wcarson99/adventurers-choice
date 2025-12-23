@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { EncounterHelpers } from '../helpers/encounter-helpers';
+import { ScenarioHelpers } from '../helpers/scenario-helpers';
 
 test.describe('Path Planning System', () => {
-  let encounter: EncounterHelpers;
+  let scenario: ScenarioHelpers;
 
   test.beforeEach(async ({ page }) => {
-    encounter = new EncounterHelpers(page);
+    scenario = new ScenarioHelpers(page);
     
     // Navigate to splash screen
     await page.goto('/', { waitUntil: 'networkidle' });
@@ -14,8 +14,8 @@ test.describe('Path Planning System', () => {
     const gameSelect = page.locator('select').first();
     await gameSelect.waitFor({ state: 'visible', timeout: 10000 });
     
-    // Select movement-test-campaign
-    await gameSelect.selectOption('movement-test-campaign');
+    // Select movement-test-job
+    await gameSelect.selectOption('movement-test-job');
     
     // Click Start Adventure button
     const startButton = page.getByRole('button', { name: /Start Adventure/i });
@@ -31,32 +31,32 @@ test.describe('Path Planning System', () => {
     await embarkButton.click();
     
     // Wait for encounter grid to appear (with reasonable timeout)
-    await encounter.getTile(0, 0).waitFor({ state: 'visible', timeout: 15000 });
+    await scenario.getTile(0, 0).waitFor({ state: 'visible', timeout: 15000 });
   });
 
   test('character does not move immediately when clicking tiles in planning mode', async ({ page }) => {
     // Step 1: Select character at (0,1)
-    await encounter.clickTile(0, 1);
+    await scenario.clickTile(0, 1);
     await page.waitForTimeout(500);
     
     // Step 2: Click a valid move tile (1,1) - character should NOT move yet
-    await encounter.clickTile(1, 1);
+    await scenario.clickTile(1, 1);
     await page.waitForTimeout(500);
     
     // Step 3: Verify character is STILL at starting position (0,1)
-    const entityAtStart = await encounter.getEntityAtTile(0, 1);
+    const entityAtStart = await scenario.getEntityAtTile(0, 1);
     expect(entityAtStart).not.toBeNull();
     
     // Step 4: Verify character is NOT at clicked position (1,1) yet
-    const entityAtTarget = await encounter.getEntityAtTile(1, 1);
+    const entityAtTarget = await scenario.getEntityAtTile(1, 1);
     expect(entityAtTarget).toBeNull();
   });
 
   test('execute free moves button appears when path is planned', async ({ page }) => {
     // Step 1: Select character and add a step to path
-    await encounter.clickTile(0, 1);
+    await scenario.clickTile(0, 1);
     await page.waitForTimeout(500);
-    await encounter.clickTile(1, 1);
+    await scenario.clickTile(1, 1);
     await page.waitForTimeout(500);
     
     // Step 2: Look for "Execute Free Moves" button
@@ -69,20 +69,20 @@ test.describe('Path Planning System', () => {
     // Both will plan to move to (1,1) - same square (conflict)
     
     // Step 1: Plan warrior to move to (1,1)
-    await encounter.clickTile(0, 1); // Select warrior
+    await scenario.clickTile(0, 1); // Select warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // Plan move to (1,1)
+    await scenario.clickTile(1, 1); // Plan move to (1,1)
     await page.waitForTimeout(300);
     
     // Step 2: Deselect warrior by clicking warrior again (Option 1)
-    await encounter.clickTile(0, 1); // Click warrior again to deselect
+    await scenario.clickTile(0, 1); // Click warrior again to deselect
     await page.waitForTimeout(300);
     
     // Step 3: Plan thief to move to (1,1) - same square as warrior's next step
     // This should be allowed (no blocking), but button should be disabled
-    await encounter.clickTile(0, 2); // Select thief
+    await scenario.clickTile(0, 2); // Select thief
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // Plan move to (1,1) - CONFLICT!
+    await scenario.clickTile(1, 1); // Plan move to (1,1) - CONFLICT!
     await page.waitForTimeout(300);
     
     // Step 4: Verify Execute Free Moves button is disabled
@@ -99,17 +99,17 @@ test.describe('Path Planning System', () => {
     await page.waitForTimeout(300);
     
     // Replan: warrior to (1,2), thief to (1,1) - no conflict
-    await encounter.clickTile(0, 1); // Select warrior
+    await scenario.clickTile(0, 1); // Select warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 2); // Plan warrior to (1,2)
-    await page.waitForTimeout(300);
-    
-    await encounter.clickTile(0, 1); // Deselect warrior
+    await scenario.clickTile(1, 2); // Plan warrior to (1,2)
     await page.waitForTimeout(300);
     
-    await encounter.clickTile(0, 2); // Select thief
+    await scenario.clickTile(0, 1); // Deselect warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // Plan thief to (1,1)
+    
+    await scenario.clickTile(0, 2); // Select thief
+    await page.waitForTimeout(300);
+    await scenario.clickTile(1, 1); // Plan thief to (1,1)
     await page.waitForTimeout(300);
     
     // Step 6: Verify Execute Free Moves is now enabled
@@ -122,19 +122,19 @@ test.describe('Path Planning System', () => {
 
   test('execute free moves moves all characters simultaneously', async ({ page }) => {
     // Step 1: Plan warrior to move right to (1,1)
-    await encounter.clickTile(0, 1); // Select warrior
+    await scenario.clickTile(0, 1); // Select warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // Plan move right
+    await scenario.clickTile(1, 1); // Plan move right
     await page.waitForTimeout(300);
     
     // Step 2: Deselect warrior by clicking warrior again (Option 1)
-    await encounter.clickTile(0, 1); // Click warrior again to deselect
+    await scenario.clickTile(0, 1); // Click warrior again to deselect
     await page.waitForTimeout(300);
     
     // Step 3: Plan thief to move right to (1,2)
-    await encounter.clickTile(0, 2); // Select thief
+    await scenario.clickTile(0, 2); // Select thief
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 2); // Plan move right
+    await scenario.clickTile(1, 2); // Plan move right
     await page.waitForTimeout(300);
     
     // Step 4: Click Execute Free Moves
@@ -144,15 +144,15 @@ test.describe('Path Planning System', () => {
     await page.waitForTimeout(500);
     
     // Step 5: Verify both characters moved
-    const warriorAtNewPos = await encounter.getEntityAtTile(1, 1);
-    const thiefAtNewPos = await encounter.getEntityAtTile(1, 2);
+    const warriorAtNewPos = await scenario.getEntityAtTile(1, 1);
+    const thiefAtNewPos = await scenario.getEntityAtTile(1, 2);
     
     expect(warriorAtNewPos).not.toBeNull();
     expect(thiefAtNewPos).not.toBeNull();
     
     // Step 6: Verify characters are no longer at starting positions
-    const warriorAtStart = await encounter.getEntityAtTile(0, 1);
-    const thiefAtStart = await encounter.getEntityAtTile(0, 2);
+    const warriorAtStart = await scenario.getEntityAtTile(0, 1);
+    const thiefAtStart = await scenario.getEntityAtTile(0, 2);
     
     expect(warriorAtStart).toBeNull();
     expect(thiefAtStart).toBeNull();
@@ -160,17 +160,17 @@ test.describe('Path Planning System', () => {
 
   test('clear all movements resets paths and positions', async ({ page }) => {
     // Step 1: Plan movements for both characters
-    await encounter.clickTile(0, 1); // Select warrior
+    await scenario.clickTile(0, 1); // Select warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // Plan move
-    await page.waitForTimeout(300);
-    
-    await encounter.clickTile(0, 1); // Deselect warrior
+    await scenario.clickTile(1, 1); // Plan move
     await page.waitForTimeout(300);
     
-    await encounter.clickTile(0, 2); // Select thief
+    await scenario.clickTile(0, 1); // Deselect warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 2); // Plan move
+    
+    await scenario.clickTile(0, 2); // Select thief
+    await page.waitForTimeout(300);
+    await scenario.clickTile(1, 2); // Plan move
     await page.waitForTimeout(300);
     
     // Step 2: Click Clear All Movements
@@ -179,8 +179,8 @@ test.describe('Path Planning System', () => {
     await page.waitForTimeout(500);
     
     // Step 3: Verify characters are back at starting positions
-    const warriorAtStart = await encounter.getEntityAtTile(0, 1);
-    const thiefAtStart = await encounter.getEntityAtTile(0, 2);
+    const warriorAtStart = await scenario.getEntityAtTile(0, 1);
+    const thiefAtStart = await scenario.getEntityAtTile(0, 2);
     
     expect(warriorAtStart).not.toBeNull();
     expect(thiefAtStart).not.toBeNull();
@@ -191,17 +191,17 @@ test.describe('Path Planning System', () => {
     expect(isVisible).toBe(false);
     
     // Step 5: Plan new movements
-    await encounter.clickTile(0, 1); // Select warrior
+    await scenario.clickTile(0, 1); // Select warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // Plan move right
-    await page.waitForTimeout(300);
-    
-    await encounter.clickTile(0, 1); // Deselect warrior
+    await scenario.clickTile(1, 1); // Plan move right
     await page.waitForTimeout(300);
     
-    await encounter.clickTile(0, 2); // Select thief
+    await scenario.clickTile(0, 1); // Deselect warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 2); // Plan move right
+    
+    await scenario.clickTile(0, 2); // Select thief
+    await page.waitForTimeout(300);
+    await scenario.clickTile(1, 2); // Plan move right
     await page.waitForTimeout(300);
     
     // Step 6: Click Execute Free Moves
@@ -211,8 +211,8 @@ test.describe('Path Planning System', () => {
     await page.waitForTimeout(500);
     
     // Step 7: Verify both characters moved
-    const warriorMoved = await encounter.getEntityAtTile(1, 1);
-    const thiefMoved = await encounter.getEntityAtTile(1, 2);
+    const warriorMoved = await scenario.getEntityAtTile(1, 1);
+    const thiefMoved = await scenario.getEntityAtTile(1, 2);
     
     expect(warriorMoved).not.toBeNull();
     expect(thiefMoved).not.toBeNull();
@@ -220,11 +220,11 @@ test.describe('Path Planning System', () => {
 
   test('button state updates after execution based on next step validity', async ({ page }) => {
     // Step 1: Plan warrior with 2 steps: (1,1) then (2,1)
-    await encounter.clickTile(0, 1); // Select warrior
+    await scenario.clickTile(0, 1); // Select warrior
     await page.waitForTimeout(300);
-    await encounter.clickTile(1, 1); // First step
+    await scenario.clickTile(1, 1); // First step
     await page.waitForTimeout(300);
-    await encounter.clickTile(2, 1); // Second step
+    await scenario.clickTile(2, 1); // Second step
     await page.waitForTimeout(300);
     
     // Step 2: Verify button is enabled (first step is valid)
