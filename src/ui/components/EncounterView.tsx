@@ -7,20 +7,17 @@ import { PushSystem } from '../../game-engine/encounters/PushSystem';
 import { MovementPlan } from '../../game-engine/encounters/MovementPlan';
 import { TurnSystem } from '../../game-engine/encounters/TurnSystem';
 import { WinConditionSystem } from '../../game-engine/encounters/WinConditionSystem';
+import { EncounterPhaseManager, PlanningPhase } from '../../game-engine/encounters/EncounterPhaseManager';
+import { EncounterStateManager, PlannedAction, ValidMove, ValidPushDirection } from '../../game-engine/encounters/EncounterStateManager';
 
 interface EncounterViewProps {
   activeMission?: { title: string; description: string; days?: number };
   onCompleteMission?: () => void;
 }
 
-type PlanningPhase = 'movement' | 'skill' | 'executing';
+// PlanningPhase type imported from EncounterPhaseManager
 
-interface PlannedAction {
-  characterId: number;
-  action: string;
-  targetId?: number;
-  cost: number;
-}
+// PlannedAction type imported from EncounterStateManager
 
 export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onCompleteMission: _onCompleteMission }) => {
   const { grid, world, completeMission, consumeFood, party, showStatus, activeCampaign, currentEncounterIndex } = useGame();
@@ -41,14 +38,25 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
   const movementSystem = new MovementSystem();
   const pushSystem = new PushSystem();
   const turnSystemRef = useRef<TurnSystem>(new TurnSystem());
+  const phaseManagerRef = useRef<EncounterPhaseManager>(new EncounterPhaseManager());
+  const stateManagerRef = useRef<EncounterStateManager>(new EncounterStateManager());
   const winConditionSystem = new WinConditionSystem();
   const [currentTurn, setCurrentTurn] = useState(1); // Track turn for React re-renders
 
-  // Reset turn system when encounter changes
+  // Reset systems when encounter changes
   React.useEffect(() => {
     if (currentEncounterIndex !== undefined) {
       turnSystemRef.current.reset();
+      phaseManagerRef.current.reset();
+      stateManagerRef.current.reset();
       setCurrentTurn(1); // Reset displayed turn to 1
+      setPhase('movement'); // Reset phase to movement
+      // Sync React state with state manager
+      setSelectedCharacter(null);
+      setSelectedObject(null);
+      setValidMoves([]);
+      setValidPushDirections([]);
+      setPlannedActions([]);
     }
   }, [currentEncounterIndex]);
 
@@ -93,6 +101,43 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       return '🎯 Click a character to select, then choose an action from the dropdown.';
     }
     return '👆 Click a character to select, then move or push crates';
+  };
+
+  // Helper functions to sync React state with state manager
+  const updateSelectedCharacter = (characterId: number | null) => {
+    stateManagerRef.current.setSelectedCharacter(characterId);
+    setSelectedCharacter(characterId);
+  };
+
+  const updateSelectedObject = (objectId: number | null) => {
+    stateManagerRef.current.setSelectedObject(objectId);
+    setSelectedObject(objectId);
+  };
+
+  const updateValidMoves = (moves: ValidMove[]) => {
+    stateManagerRef.current.setValidMoves(moves);
+    setValidMoves(moves);
+  };
+
+  const updateValidPushDirections = (directions: ValidPushDirection[]) => {
+    stateManagerRef.current.setValidPushDirections(directions);
+    setValidPushDirections(directions);
+  };
+
+  const updatePlannedActions = (actions: PlannedAction[]) => {
+    stateManagerRef.current.clearPlannedActions();
+    actions.forEach(action => stateManagerRef.current.addPlannedAction(action));
+    setPlannedActions(actions);
+  };
+
+  const addPlannedAction = (action: PlannedAction) => {
+    stateManagerRef.current.addPlannedAction(action);
+    setPlannedActions(stateManagerRef.current.getPlannedActions());
+  };
+
+  const clearPlannedActions = () => {
+    stateManagerRef.current.clearPlannedActions();
+    setPlannedActions([]);
   };
 
   // Get all player characters
@@ -232,17 +277,17 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
 
       // If clicking the same character, deselect
       if (selectedCharacter === characterId) {
-        setSelectedCharacter(null);
-        setValidMoves([]);
-        setSelectedObject(null);
-        setValidPushDirections([]);
+        updateSelectedCharacter(null);
+        updateValidMoves([]);
+        updateSelectedObject(null);
+        updateValidPushDirections([]);
         return;
       }
 
       // Select character and show valid moves
       // If character has a planned path, use the last step in the path
       // Otherwise, use current position
-      setSelectedCharacter(characterId);
+      updateSelectedCharacter(characterId);
       const path = movementPlan.getPath(characterId);
       let fromPos: { x: number; y: number };
       
@@ -255,16 +300,16 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
       }
       
       const moves = movementSystem.getValidMoves(world, grid, characterId, fromPos, attrs.mov);
-      setValidMoves(moves);
+      updateValidMoves(moves);
     } else if (phase === 'skill') {
       // In skill phase, select character for action planning
       if (selectedCharacter === characterId) {
-        setSelectedCharacter(null);
-        setSelectedObject(null);
+        updateSelectedCharacter(null);
+        updateSelectedObject(null);
         return;
       }
-      setSelectedCharacter(characterId);
-      setSelectedObject(null);
+      updateSelectedCharacter(characterId);
+      updateSelectedObject(null);
     }
     
     // Check if character is adjacent to any pushable objects
@@ -293,11 +338,11 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
     
     // If adjacent to exactly one object, auto-select it and show push directions
     if (adjacentObjects.length === 1) {
-      setSelectedObject(adjacentObjects[0].id);
-      setValidPushDirections(adjacentObjects[0].pushActions.map(a => ({ ...a.direction, staminaCost: a.staminaCost })));
+      updateSelectedObject(adjacentObjects[0].id);
+      updateValidPushDirections(adjacentObjects[0].pushActions.map(a => ({ ...a.direction, staminaCost: a.staminaCost })));
     } else {
-      setSelectedObject(null);
-      setValidPushDirections([]);
+      updateSelectedObject(null);
+      updateValidPushDirections([]);
     }
   };
 
@@ -1262,7 +1307,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                   
                   if (allComplete || !movementPlan.hasAnyPath()) {
                     // Transition to skill phase
-                    setPhase('skill');
+                    phaseManagerRef.current.transitionToSkill();
+                    setPhase(phaseManagerRef.current.getCurrentPhase());
                     setSelectedCharacter(null);
                     setValidMoves([]);
                   } else {
@@ -1500,7 +1546,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                       movementSystem.moveCharacter(world, charId, originalPos);
                     });
                     setPlannedActions([]);
-                    setPhase('movement');
+                    phaseManagerRef.current.resetToMovement();
+                    setPhase(phaseManagerRef.current.getCurrentPhase());
                     setSelectedCharacter(null);
                     setSelectedObject(null);
                     setTick(t => t + 1); // Trigger re-render
@@ -1522,7 +1569,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                 <button
                   onClick={() => {
                     // Execute all planned actions (or everyone waits if no actions planned)
-                    setPhase('executing');
+                    phaseManagerRef.current.transitionToExecuting();
+                    setPhase(phaseManagerRef.current.getCurrentPhase());
                     
                     // Execute each planned action
                     plannedActions.forEach((plannedAction) => {
@@ -1641,7 +1689,8 @@ export const EncounterView: React.FC<EncounterViewProps> = ({ activeMission, onC
                       turnSystemRef.current.incrementTurn();
                       setCurrentTurn(turnSystemRef.current.getCurrentTurn() + 1); // Update displayed turn
                       setPlannedActions([]);
-                      setPhase('movement');
+                      phaseManagerRef.current.resetToMovement();
+                      setPhase(phaseManagerRef.current.getCurrentPhase());
                       setSelectedCharacter(null);
                       setSelectedObject(null);
                       // Update original positions for next turn
