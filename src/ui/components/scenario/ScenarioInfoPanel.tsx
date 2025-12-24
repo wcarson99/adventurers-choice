@@ -42,6 +42,9 @@ interface ScenarioInfoPanelProps {
   // Turn action props
   selectingDirection?: boolean;
   onDirectionSelect?: (dx: number, dy: number) => void;
+  // Abandon button props
+  scenarioType?: 'combat' | 'obstacle' | 'trading';
+  onAbandon?: () => void;
 }
 
 // Runtime check: This will fail if old code tries to import this module
@@ -84,6 +87,8 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
   onPass,
   selectingDirection = false,
   onDirectionSelect: _onDirectionSelect,
+  scenarioType,
+  onAbandon,
 }) => {
   // CRITICAL CHECK: Verify new code is running
   if (typeof window !== 'undefined' && !(window as any).__SCENARIO_INFO_PANEL_V2__) {
@@ -422,6 +427,28 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
             ×
           </button>
         </div>
+      )}
+
+      {/* Abandon Button - Only visible for obstacle scenarios */}
+      {scenarioType === 'obstacle' && onAbandon && (
+        <button
+          onClick={onAbandon}
+          style={{
+            marginTop: 'auto',
+            padding: '0.75rem',
+            fontSize: '0.9rem',
+            fontWeight: 'bold',
+            backgroundColor: '#d32f2f',
+            color: '#fff',
+            border: `2px solid ${theme.colors.imageBorder}`,
+            borderRadius: '6px',
+            cursor: 'pointer',
+            textAlign: 'center',
+            width: '100%'
+          }}
+        >
+          Abandon Scenario
+        </button>
       )}
     </div>
   );

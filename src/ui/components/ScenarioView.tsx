@@ -20,7 +20,7 @@ interface ScenarioViewProps {
 // PlannedAction type imported from EncounterStateManager
 
 export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCompleteMission: _onCompleteMission }) => {
-  const { grid, world, completeMission, consumeFood, party, showStatus, activeJob, currentScenarioIndex } = useGame();
+  const { grid, world, completeMission, consumeFood, party, showStatus, activeJob, currentScenarioIndex, setView } = useGame();
   const [_tick, setTick] = useState(0); // Force render
   // Debug flag to show tile coordinates (set to true for testing)
   const [showTileCoordinates] = useState<boolean>(false);
@@ -535,6 +535,24 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     }
   };
 
+  // Handle Abandon button click - return to town without completing mission
+  const handleAbandon = () => {
+    setView('TOWN');
+    showStatus('Scenario abandoned. Returned to town.', 'info', 2000);
+  };
+
+  // Determine scenario type from activeJob or activeMission
+  const getScenarioType = (): 'combat' | 'obstacle' | 'trading' | undefined => {
+    if (activeJob && currentScenarioIndex !== undefined) {
+      const scenario = activeJob.scenarios[currentScenarioIndex];
+      return scenario.minigameType;
+    }
+    if (activeMission) {
+      return activeMission.encounterType.type;
+    }
+    return undefined;
+  };
+
   // @deprecated - Old phase-based handlers removed (no longer used with AP system)
 
   return (
@@ -592,6 +610,8 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
         getCurrentActiveCharacter={() => gridControllerRef.current.getCurrentActiveCharacter()}
         getCharacterAP={(characterId) => gridControllerRef.current.getCharacterAP(characterId)}
         onPass={handlePass}
+        scenarioType={getScenarioType()}
+        onAbandon={handleAbandon}
       />
     </div>
   );
