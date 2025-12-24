@@ -213,24 +213,29 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
                 const isActive = charId === currentActive;
                 const isNPC = world.getComponent<NPCComponent>(charId, 'NPC') !== undefined;
                 const attrs = world.getComponent<AttributesComponent>(charId, 'Attributes');
+                const renderable = world.getComponent<RenderableComponent>(charId, 'Renderable');
                 
                 // Get character name
                 let charName: string;
                 if (isNPC) {
-                  // For NPCs, get first letter from renderable char
-                  const renderable = world.getComponent<RenderableComponent>(charId, 'Renderable');
-                  const firstLetter = renderable?.char || 'E';
-                  // Try to infer name from first letter (E=Enemy, W=Warrior, T=Thief, etc.)
-                  const nameMap: { [key: string]: string } = {
-                    'E': 'Enemy',
-                    'W': 'Enemy Warrior',
-                    'T': 'Enemy Thief',
-                    'B': 'Enemy Bard',
-                    'C': 'Enemy Cleric',
-                    'P': 'Enemy Paladin',
-                    'Z': 'Enemy Wizard'
-                  };
-                  charName = nameMap[firstLetter] || `Enemy ${firstLetter}`;
+                  // For NPCs, use stored name if available, otherwise infer from first letter
+                  if (renderable?.name) {
+                    charName = renderable.name;
+                  } else {
+                    const firstLetter = renderable?.char || 'E';
+                    // Try to infer name from first letter (E=Enemy, W=Warrior, T=Thief, etc.)
+                    const nameMap: { [key: string]: string } = {
+                      'E': 'Enemy',
+                      'W': 'Enemy Warrior',
+                      'T': 'Enemy Thief',
+                      'B': 'Enemy Bard',
+                      'C': 'Enemy Cleric',
+                      'P': 'Enemy Paladin',
+                      'Z': 'Enemy Wizard',
+                      'G': 'Goblin' // G for Goblin
+                    };
+                    charName = nameMap[firstLetter] || `Enemy ${firstLetter}`;
+                  }
                 } else {
                   // For players, get from party array
                   const charIndex = Array.from(world.getAllEntities()).indexOf(charId);
@@ -255,13 +260,28 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
                     <span style={{ width: '20px', textAlign: 'center' }}>
                       {index + 1}.
                     </span>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: isNPC ? '#ff0000' : '#00ff00',
-                      flexShrink: 0
-                    }} />
+                    {/* Character image at 25% size (assuming original is ~64px, so 25% = 16px) */}
+                    {renderable?.sprite ? (
+                      <img
+                        src={renderable.sprite}
+                        alt={charName}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          objectFit: 'contain',
+                          flexShrink: 0,
+                          imageRendering: 'pixelated' // Keep pixel art crisp
+                        }}
+                      />
+                    ) : (
+                      <span style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: isNPC ? '#ff0000' : '#00ff00',
+                        flexShrink: 0
+                      }} />
+                    )}
                     <span style={{ flex: 1 }}>{charName}</span>
                     {attrs && (
                       <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>

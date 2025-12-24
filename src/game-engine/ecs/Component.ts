@@ -15,6 +15,7 @@ export interface RenderableComponent extends Component {
   char: string; // For text fallback
   color: string;
   sprite?: string; // URL or key
+  name?: string; // Optional full name for display
 }
 
 export interface StatsComponent extends Component {

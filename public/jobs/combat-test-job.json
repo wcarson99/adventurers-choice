@@ -35,14 +35,14 @@
           "position": { "x": 0, "y": 2 },
           "properties": {
             "name": "Hero 2",
-            "archetype": "Wizard",
+            "archetype": "Thief",
             "attributes": {
               "pwr": 3,
-              "mov": 2,
-              "inf": 5,
-              "cre": 4
+              "mov": 4,
+              "inf": 3,
+              "cre": 2
             },
-            "sprite": "/assets/characters/wizard.png",
+            "sprite": "/assets/characters/thief.png",
             "gold": 20,
             "food": 4
           }
@@ -51,7 +51,7 @@
           "type": "npc",
           "position": { "x": 5, "y": 1 },
           "properties": {
-            "name": "Enemy Warrior",
+            "name": "Goblin Brute",
             "archetype": "Warrior",
             "attributes": {
               "pwr": 4,
@@ -69,7 +69,7 @@
           "type": "npc",
           "position": { "x": 5, "y": 2 },
           "properties": {
-            "name": "Enemy Thief",
+            "name": "Goblin Scout",
             "archetype": "Thief",
             "attributes": {
               "pwr": 3,

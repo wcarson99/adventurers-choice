@@ -143,6 +143,7 @@ export class ScenarioFactory {
       char: props.name[0].toUpperCase(),
       color: '#d32f2f', // Red for enemies/NPCs (distinct from player accent color)
       sprite: props.sprite || '/assets/characters/warrior.png', // Default sprite, can be overridden
+      name: props.name, // Store full name for display
     } as RenderableComponent);
 
     // Add attributes component
@@ -164,10 +165,10 @@ export class ScenarioFactory {
       maxStamina: props.maxStamina ?? 50,
     } as StatsComponent);
 
-    // Add direction component (default facing right)
+    // Add direction component (NPCs face left, toward players)
     world.addComponent(entityId, {
       type: 'Direction',
-      dx: 1,
+      dx: -1,
       dy: 0,
     } as DirectionComponent);
 
