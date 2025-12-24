@@ -7,6 +7,8 @@ import { GridController } from '../../game-engine/encounters/GridController';
 import { ScenarioGrid } from './scenario/ScenarioGrid';
 import { ScenarioInfoPanel } from './scenario/ScenarioInfoPanel';
 import { SUCCESS_MESSAGE_DURATION_MS } from '../constants';
+import { ActionFactory } from '../../game-engine/actions';
+import type { Action } from '../../types/Action';
 
 interface ScenarioViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -147,68 +149,92 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
 
   // @deprecated - planned actions no longer used, actions execute immediately
 
-  // Get available actions for a character (filtered by AP affordability)
-  const getAvailableActions = (characterId: number): Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> => {
+  // Get available actions for a character (using Action classes)
+  const getAvailableActions = (characterId: number): Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number; action?: Action }> => {
     const attrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
     if (!attrs) {
       return [];
     }
 
-    const actions: Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number }> = [];
-    
-    // Always include Pass action (costs 0 AP)
-    actions.push({ name: 'Pass', cost: 0 });
-    
-    // Add Turn action if character can afford it (5 AP)
-    if (gridControllerRef.current.canAffordAction(characterId, 'Turn')) {
-      actions.push({ name: 'Turn', cost: 5 });
-    }
-    
-    // Add Move action if character can afford it (15 AP)
-    if (gridControllerRef.current.canAffordAction(characterId, 'Move')) {
-      actions.push({ name: 'Move', cost: 15 });
-    }
-    
-    // Check if character can push (PWR 3+) and can afford it (25 AP)
-    // Only enable if character is facing a pushable item
-    if (attrs.pwr >= 3 && gridControllerRef.current.canAffordAction(characterId, 'Push')) {
-      const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
-      const directionComp = world.getComponent<DirectionComponent>(characterId, 'Direction');
-      const charPos = currentPos ? { x: currentPos.x, y: currentPos.y } : null;
-      
-      if (charPos && directionComp) {
-        // Check for pushable object in the direction the character is facing
-        const targetPos = {
-          x: charPos.x + directionComp.dx,
-          y: charPos.y + directionComp.dy,
-        };
+    // Build ActionContext for this character
+    const context = gridControllerRef.current.buildActionContext(world, grid, characterId);
 
-        // Look for a pushable object at the target position
-        const entities = world.getAllEntities();
-        const targetPushable = entities.find(id => {
-          const pushable = world.getComponent<PushableComponent>(id, 'Pushable');
-          if (!pushable) return false;
-          const objPos = world.getComponent<PositionComponent>(id, 'Position');
-          if (!objPos) return false;
-          return objPos.x === targetPos.x && objPos.y === targetPos.y;
-        });
+    // Create all possible action instances
+    const possibleActions: Action[] = [];
 
-        // If found pushable object in facing direction, check if push is valid
-        if (targetPushable) {
-          const pushActions = pushSystem.getValidPushActions(world, grid, characterId, targetPushable);
-          if (pushActions.length > 0) {
-            actions.push({
-              name: 'Push',
-              cost: 25,
-              requiresItem: true,
-              targetId: targetPushable
-            });
-          }
+    // Always include Pass action
+    possibleActions.push(ActionFactory.createPassAction());
+
+    // Add Turn action (we'll check canExecute later)
+    // For Turn, we need a direction, but we'll create a placeholder
+    // The actual direction will be set when the action is executed
+    possibleActions.push(ActionFactory.createTurnAction({ dx: 1, dy: 0 }));
+
+    // For Move, we can't create a specific instance without a target position
+    // So we'll check affordability separately and add it as available
+    // The actual MoveAction will be created when executing
+
+    // For Push, check if character can push and find pushable objects
+    const currentPos = world.getComponent<PositionComponent>(characterId, 'Position');
+    const directionComp = world.getComponent<DirectionComponent>(characterId, 'Direction');
+    const charPos = currentPos ? { x: currentPos.x, y: currentPos.y } : null;
+    
+    if (charPos && directionComp && attrs.pwr >= 3) {
+      // Check for pushable object in the direction the character is facing
+      const targetPos = {
+        x: charPos.x + directionComp.dx,
+        y: charPos.y + directionComp.dy,
+      };
+
+      // Look for a pushable object at the target position
+      const entities = world.getAllEntities();
+      const targetPushable = entities.find(id => {
+        const pushable = world.getComponent<PushableComponent>(id, 'Pushable');
+        if (!pushable) return false;
+        const objPos = world.getComponent<PositionComponent>(id, 'Position');
+        if (!objPos) return false;
+        return objPos.x === targetPos.x && objPos.y === targetPos.y;
+      });
+
+      // If found pushable object in facing direction, create PushAction
+      if (targetPushable) {
+        const pushActions = pushSystem.getValidPushActions(world, grid, characterId, targetPushable);
+        if (pushActions.length > 0) {
+          possibleActions.push(ActionFactory.createPushAction(targetPushable));
         }
       }
     }
 
-    return actions;
+    // Filter actions by canExecute and convert to UI-friendly format
+    const availableActions: Array<{ name: string; cost: number; requiresItem?: boolean; targetId?: number; action?: Action }> = [];
+
+    for (const action of possibleActions) {
+      if (action.canExecute(context)) {
+        const actionData: { name: string; cost: number; requiresItem?: boolean; targetId?: number; action?: Action } = {
+          name: action.getName(),
+          cost: action.getCost(),
+          action: action,
+        };
+
+        // Add targetId for Push actions
+        if (action.getName() === 'Push' && 'targetId' in action) {
+          actionData.targetId = (action as any).targetId;
+          actionData.requiresItem = true;
+        }
+
+        availableActions.push(actionData);
+      }
+    }
+
+    // Add Move action if character can afford it (we check affordability separately since we need target position)
+    if (gridControllerRef.current.canAffordAction(characterId, 'Move')) {
+      availableActions.push({
+        name: 'Move',
+        cost: 15,
+      });
+    }
+
+    return availableActions;
   };
 
   const handleCharacterClick = (characterId: number) => {
@@ -269,14 +295,9 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       const isValidMove = validMoves.some(move => move.x === x && move.y === y);
       
       if (isValidMove) {
-        // Execute move action immediately
-        const result = gridControllerRef.current.executeActionImmediate(
-          world,
-          grid,
-          'Move',
-          selectedCharacter,
-          { x, y }
-        );
+        // Create MoveAction instance and execute
+        const moveAction = ActionFactory.createMoveAction({ x, y });
+        const result = gridControllerRef.current.executeAction(moveAction, world, grid, selectedCharacter);
 
         if (result.success) {
           showStatus(`Moved! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);
@@ -311,13 +332,9 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     if (selectedCharacter === currentActiveCharacter && clickedPushable && clickedEntity) {
       const charPos = world.getComponent<PositionComponent>(selectedCharacter, 'Position');
       if (charPos && grid.getDistance(charPos, { x, y }) === 1) {
-        const result = gridControllerRef.current.executeActionImmediate(
-          world,
-          grid,
-          'Push',
-          selectedCharacter,
-          clickedEntity
-        );
+        // Create PushAction instance and execute
+        const pushAction = ActionFactory.createPushAction(clickedEntity);
+        const result = gridControllerRef.current.executeAction(pushAction, world, grid, selectedCharacter);
 
         if (result.success) {
           showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);
@@ -469,13 +486,9 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     }
 
     if (actionName === 'Push' && targetId) {
-      const result = gridControllerRef.current.executeActionImmediate(
-        world,
-        grid,
-        'Push',
-        currentActiveCharacter,
-        targetId
-      );
+      // Create PushAction instance and execute
+      const pushAction = ActionFactory.createPushAction(targetId);
+      const result = gridControllerRef.current.executeAction(pushAction, world, grid, currentActiveCharacter);
 
       if (result.success) {
         showStatus(`Pushed! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);
@@ -506,13 +519,9 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       return;
     }
 
-    const result = gridControllerRef.current.executeActionImmediate(
-      world,
-      grid,
-      'Turn',
-      currentActiveCharacter,
-      { dx, dy }
-    );
+    // Create TurnAction instance and execute
+    const turnAction = ActionFactory.createTurnAction({ dx, dy });
+    const result = gridControllerRef.current.executeAction(turnAction, world, grid, currentActiveCharacter);
 
     if (result.success) {
       showStatus(`Turned! ${result.apRemaining} AP remaining`, 'success', SUCCESS_MESSAGE_DURATION_MS);

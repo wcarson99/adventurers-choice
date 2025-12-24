@@ -53,7 +53,7 @@ if (typeof window !== 'undefined') {
 
 export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
   phase: _phase, // @deprecated
-  currentTurn,
+  currentTurn: _currentTurn, // @deprecated - kept for backward compatibility
   activeMission,
   activeJob,
   currentScenarioIndex,
@@ -64,7 +64,7 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
   world,
   party,
   pathUpdateTrigger: _pathUpdateTrigger, // @deprecated
-  getInstructions,
+  getInstructions: _getInstructions, // @deprecated - kept for backward compatibility
   getPlayerCharacters: _getPlayerCharacters,
   onCharacterClick,
   onUndoLastStep: _onUndoLastStep, // @deprecated

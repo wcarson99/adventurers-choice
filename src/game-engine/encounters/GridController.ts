@@ -9,6 +9,7 @@ import { MovementSystem } from './MovementSystem';
 import { PushSystem } from './PushSystem';
 import { MovementPlan } from './MovementPlan';
 import { ActionPointSystem } from './ActionPointSystem';
+import { Action, ActionContext } from '../../types/Action';
 
 /**
  * GridController orchestrates all grid-based scenario systems and provides a unified interface
@@ -98,6 +99,35 @@ export class GridController {
   }
 
   /**
+   * Check if an action can be executed (using Action class)
+   * 
+   * @param action - The action instance
+   * @param context - The action context
+   * @returns True if the action can be executed
+   */
+  canExecuteAction(action: Action, context: ActionContext): boolean {
+    return action.canExecute(context);
+  }
+
+  /**
+   * Build an ActionContext for a character
+   * 
+   * @param world - The ECS world
+   * @param grid - The grid
+   * @param characterId - The character ID
+   * @returns ActionContext for the character
+   */
+  buildActionContext(world: World, grid: Grid, characterId: number): ActionContext {
+    return {
+      world,
+      grid,
+      characterId,
+      apSystem: this.apSystem,
+      turnSystem: this.turnSystem,
+    };
+  }
+
+  /**
    * Start a new round by ordering characters by MOV and setting first as active
    * Resets AP for the first character to 50
    * 
@@ -113,6 +143,20 @@ export class GridController {
     if (firstCharacter !== null) {
       this.apSystem.resetAP(firstCharacter);
     }
+  }
+
+  /**
+   * Execute an action using Action class instance
+   * 
+   * @param action - The action instance to execute
+   * @param world - The ECS world
+   * @param grid - The grid
+   * @param characterId - The character ID
+   * @returns Execution result with success status and remaining AP
+   */
+  executeAction(action: Action, world: World, grid: Grid, characterId: number): ActionExecutionResult {
+    const context = this.buildActionContext(world, grid, characterId);
+    return this.actionExecutionSystem.executeActionInstance(action, context);
   }
 
   /**

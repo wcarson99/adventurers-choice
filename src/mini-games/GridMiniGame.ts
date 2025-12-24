@@ -1,4 +1,4 @@
-import type { Action } from '@/types/Action';
+import type { ActionType } from '@/types/Action';
 import type { GameState } from '@/types/GameState';
 import type { ScenarioType } from '@/types/Scenario';
 import { BaseMiniGame } from './BaseMiniGame';
@@ -67,7 +67,7 @@ export abstract class GridMiniGame extends BaseMiniGame {
    * @param action - The action to execute (Move, Push, Turn, Pass, etc.)
    * @returns Updated game state
    */
-  executeAction(action: Action): GameState {
+  executeAction(action: ActionType): GameState {
     if (!this.getIsInitialized()) {
       throw new Error(`${this.constructor.name} must be initialized before executing actions`);
     }

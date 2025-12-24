@@ -1,4 +1,4 @@
-import type { Action } from '@/types/Action';
+import type { ActionType } from '@/types/Action';
 import type { GameState } from '@/types/GameState';
 import type { ObstacleScenario } from '@/types/Scenario';
 import { GridMiniGame } from './GridMiniGame';
@@ -49,7 +49,7 @@ export class ObstacleMiniGame extends GridMiniGame {
    * @param action - The action to execute (Move, Push, Disarm, Interact, Turn, Pass, etc.)
    * @returns Updated game state
    */
-  executeAction(action: Action): GameState {
+  executeAction(action: ActionType): GameState {
     // Check turn limit before executing
     if (this.maxTurns !== undefined && this.turnCount >= this.maxTurns) {
       this.setLost(true);

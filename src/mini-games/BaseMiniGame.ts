@@ -1,4 +1,4 @@
-import type { Action } from '@/types/Action';
+import type { ActionType } from '@/types/Action';
 import type { GameState } from '@/types/GameState';
 import type { ScenarioType } from '@/types/Scenario';
 
@@ -37,10 +37,10 @@ export abstract class BaseMiniGame {
    * Execute an action in the mini game
    * This is the main entry point for game logic
    * 
-   * @param action - The action to execute
+   * @param action - The action to execute (legacy ActionType format)
    * @returns Updated game state after processing the action
    */
-  abstract executeAction(action: Action): GameState;
+  abstract executeAction(action: ActionType): GameState;
 
   /**
    * Get the current state of the mini game

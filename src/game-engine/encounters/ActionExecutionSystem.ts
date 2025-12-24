@@ -8,6 +8,7 @@ import { WinConditionSystem } from './WinConditionSystem';
 import { ActionPointSystem } from './ActionPointSystem';
 import { TurnSystem } from './TurnSystem';
 import { ACTION_COSTS } from './constants';
+import { Action, ActionContext } from '../../types/Action';
 
 export interface ActionExecutionResult {
   success: boolean;
@@ -36,6 +37,17 @@ export class ActionExecutionSystem {
     this.movementSystem = new MovementSystem();
     this.pushSystem = new PushSystem();
     this.winConditionSystem = new WinConditionSystem();
+  }
+
+  /**
+   * Execute an action using the Action class instance
+   * 
+   * @param action - The action instance to execute
+   * @param context - The action context
+   * @returns Execution result with success status and remaining AP
+   */
+  executeActionInstance(action: Action, context: ActionContext): ActionExecutionResult {
+    return action.execute(context);
   }
 
   /**
