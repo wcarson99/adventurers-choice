@@ -1,4 +1,4 @@
-export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled' | 'Attributes' | 'Pushable' | 'Direction';
+export type ComponentType = 'Position' | 'Renderable' | 'Stats' | 'PlayerControlled' | 'Attributes' | 'Pushable' | 'Direction' | 'NPC';
 
 export interface Component {
   type: ComponentType;
@@ -47,4 +47,8 @@ export interface DirectionComponent extends Component {
   type: 'Direction';
   dx: number; // Direction x component (-1, 0, or 1)
   dy: number; // Direction y component (-1, 0, or 1)
+}
+
+export interface NPCComponent extends Component {
+  type: 'NPC';
 }

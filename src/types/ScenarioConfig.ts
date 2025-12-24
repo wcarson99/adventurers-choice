@@ -61,7 +61,7 @@ export interface WinCondition {
  * Extends GridScenarioConfig with combat-specific settings
  */
 export interface CombatScenarioConfig extends GridScenarioConfig {
-  // Combat-specific configuration can be added here in the future
+  allowFleeing?: boolean; // Whether players can flee from combat
 }
 
 /**

@@ -2,6 +2,7 @@ import { MoveAction } from './MoveAction';
 import { PushAction } from './PushAction';
 import { TurnAction } from './TurnAction';
 import { PassAction } from './PassAction';
+import { AttackAction } from './AttackAction';
 
 /**
  * Factory for creating action instances
@@ -33,6 +34,13 @@ export class ActionFactory {
    */
   static createPassAction(): PassAction {
     return new PassAction();
+  }
+
+  /**
+   * Create an AttackAction instance
+   */
+  static createAttackAction(targetId: number): AttackAction {
+    return new AttackAction(targetId);
   }
 }
 

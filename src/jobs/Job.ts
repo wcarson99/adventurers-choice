@@ -27,7 +27,7 @@ export interface GridConfig {
 }
 
 export interface EntityPlacement {
-  type: 'character' | 'crate' | 'trap' | 'obstacle';
+  type: 'character' | 'crate' | 'trap' | 'obstacle' | 'npc' | 'enemy';
   position: { x: number; y: number };
   properties: EntityProperties;
 }

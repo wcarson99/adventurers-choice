@@ -53,8 +53,15 @@ export class Grid {
 
   /**
    * Check if position is a wall (border squares excluding entrance/exit)
+   * For combat grids (typically smaller, like 6x4), no walls are needed
    */
   isWall(x: number, y: number): boolean {
+    // For small grids (combat grids), no walls
+    if (this.width <= 6 && this.height <= 4) {
+      return false;
+    }
+    
+    // For standard 10x10 grids with entrance/exit zones
     // Top row (y=0) - all are walls
     if (y === 0) return true;
     // Bottom row (y=9) - all are walls

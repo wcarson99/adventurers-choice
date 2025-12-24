@@ -48,11 +48,11 @@ export class TurnSystem {
    * Start a new round by ordering characters by MOV (highest first)
    * Sets the first character as active
    * 
-   * @param getPlayerCharacters - Function that returns array of player character IDs
+   * @param getAllCharacters - Function that returns array of all character IDs (players + NPCs)
    * @param world - The ECS world to access character attributes
    */
-  startRound(getPlayerCharacters: () => number[], world: World): void {
-    const characters = getPlayerCharacters();
+  startRound(getAllCharacters: () => number[], world: World): void {
+    const characters = getAllCharacters();
     
     // Order characters by MOV (highest first)
     // If MOV is equal, maintain original order (stable sort)

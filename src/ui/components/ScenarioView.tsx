@@ -9,6 +9,8 @@ import { ScenarioInfoPanel } from './scenario/ScenarioInfoPanel';
 import { SUCCESS_MESSAGE_DURATION_MS } from '../constants';
 import { ActionFactory } from '../../game-engine/actions';
 import type { Action } from '../../types/Action';
+import { AISystem } from '../../game-engine/encounters/AISystem';
+import { NPCComponent } from '../../game-engine/ecs/Component';
 
 interface ScenarioViewProps {
   activeMission?: { title: string; description: string; days?: number };
@@ -30,13 +32,14 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
   const [validPushDirections, setValidPushDirections] = useState<Array<{ dx: number; dy: number; staminaCost: number }>>([]);
   const [selectingDirection, setSelectingDirection] = useState<boolean>(false);
   const gridControllerRef = useRef<GridController>(new GridController());
+  const aiSystemRef = useRef<AISystem>(new AISystem());
   const [currentRound, setCurrentRound] = useState(1); // Track round for React re-renders
   
   // Get systems from controller for convenience
   const movementSystem = gridControllerRef.current.getMovementSystem();
   const pushSystem = gridControllerRef.current.getPushSystem();
 
-  // Get all player characters (used in multiple places)
+  // Get all player characters (used for win conditions, etc.)
   const getPlayerCharacters = () => {
     if (!world) return [];
     const entities = world.getAllEntities();
@@ -46,13 +49,182 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     });
   };
 
+  // Get all characters (players + NPCs) for turn order
+  const getAllCharacters = () => {
+    if (!world) return [];
+    const entities = world.getAllEntities();
+    return entities.filter(id => {
+      // Include all entities with Attributes component (players and NPCs)
+      const attrs = world.getComponent<AttributesComponent>(id, 'Attributes');
+      return attrs !== undefined;
+    });
+  };
+
+  // Execute NPC turn using AI (defined before handlePass so it can be referenced)
+  const executeNPCTurn = (npcId: number) => {
+    if (!world || !grid) return;
+
+    // Build action context function for AI
+    const buildActionContext = (characterId: number) => {
+      return gridControllerRef.current.buildActionContext(world, grid, characterId);
+    };
+
+    // Execute AI turn
+    const aiResult = aiSystemRef.current.executeAITurn(
+      world,
+      grid,
+      npcId,
+      getPlayerCharacters,
+      gridControllerRef.current.getAPSystem(),
+      buildActionContext
+    );
+
+    if (aiResult) {
+      if (aiResult.action === 'Pass') {
+        // NPC passed - move to next character
+        handlePass();
+      } else {
+        // NPC executed an action - update UI and continue NPC turn if they still have AP
+        setTick(t => t + 1);
+        
+        // Check if NPC still has AP and is still active
+        const currentActive = gridControllerRef.current.getCurrentActiveCharacter();
+        if (currentActive === npcId) {
+          const remainingAP = gridControllerRef.current.getCharacterAP(npcId);
+          if (remainingAP > 0) {
+            // NPC still has AP - continue AI turn
+            setTimeout(() => executeNPCTurn(npcId), 100); // Small delay for visual feedback
+          } else {
+            // NPC out of AP - pass automatically
+            handlePass();
+          }
+        } else {
+          // Turn changed (round complete or next character) - handle normally
+          if (gridControllerRef.current.isRoundComplete()) {
+            handlePass(); // This will handle round completion
+          } else {
+            // Next character - check if it's an NPC
+            const nextChar = gridControllerRef.current.getCurrentActiveCharacter();
+            if (nextChar !== null) {
+              const isNextNPC = world.getComponent<NPCComponent>(nextChar, 'NPC') !== undefined;
+              if (isNextNPC) {
+                setTimeout(() => executeNPCTurn(nextChar), 100);
+              } else {
+                // Next is a player - update UI
+                updateSelectedCharacter(nextChar);
+                const attrs = world.getComponent<AttributesComponent>(nextChar, 'Attributes');
+                const pos = world.getComponent<PositionComponent>(nextChar, 'Position');
+                if (attrs && pos) {
+                  const canAffordMove = gridControllerRef.current.canAffordAction(nextChar, 'Move');
+                  if (canAffordMove) {
+                    const moves = movementSystem.getValidMoves(world, grid, nextChar, { x: pos.x, y: pos.y }, attrs.mov);
+                    updateValidMoves(moves);
+                  } else {
+                    setValidMoves([]);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // AI returned null - pass
+      handlePass();
+    }
+  };
+
+  // Handle Pass button click
+  const handlePass = () => {
+    const currentActiveCharacter = gridControllerRef.current.getCurrentActiveCharacter();
+    if (currentActiveCharacter === null) {
+      showStatus('No active character', 'error');
+      return;
+    }
+
+    const roundComplete = gridControllerRef.current.passTurn();
+    
+    if (roundComplete) {
+      // Round completed - start next round
+      gridControllerRef.current.startRound(getAllCharacters, world);
+      setCurrentRound(gridControllerRef.current.getCurrentRound());
+      showStatus('Round complete! Starting next round...', 'success', SUCCESS_MESSAGE_DURATION_MS);
+      
+      // Auto-select first character of new round (or execute AI if NPC)
+      const nextActiveChar = gridControllerRef.current.getCurrentActiveCharacter();
+      if (nextActiveChar !== null && grid) {
+        const isNPC = world.getComponent<NPCComponent>(nextActiveChar, 'NPC') !== undefined;
+        
+        if (isNPC) {
+          // NPC turn - execute AI
+          setTimeout(() => executeNPCTurn(nextActiveChar), 100);
+        } else {
+          // Player character - auto-select and default to Move or Pass
+          updateSelectedCharacter(nextActiveChar);
+          const attrs = world.getComponent<AttributesComponent>(nextActiveChar, 'Attributes');
+          const pos = world.getComponent<PositionComponent>(nextActiveChar, 'Position');
+          
+          // Check if character can afford Move (15 AP)
+          const canAffordMove = gridControllerRef.current.canAffordAction(nextActiveChar, 'Move');
+          
+          if (canAffordMove && attrs && pos) {
+            // Default to Move: calculate and show valid moves
+            const moves = movementSystem.getValidMoves(world, grid, nextActiveChar, { x: pos.x, y: pos.y }, attrs.mov);
+            updateValidMoves(moves);
+          } else {
+            // Default to Pass: clear moves
+            setValidMoves([]);
+          }
+        }
+      } else {
+        updateSelectedCharacter(null);
+        setValidMoves([]);
+      }
+    } else {
+      // Next character's turn - check if it's an NPC
+      const nextCharacter = gridControllerRef.current.getCurrentActiveCharacter();
+      if (nextCharacter !== null && grid) {
+        const isNPC = world.getComponent<NPCComponent>(nextCharacter, 'NPC') !== undefined;
+        
+        if (isNPC) {
+          // NPC turn - execute AI actions until NPC passes
+          executeNPCTurn(nextCharacter);
+        } else {
+          // Player character's turn - auto-select and default to Move or Pass
+          updateSelectedCharacter(nextCharacter);
+          const attrs = world.getComponent<AttributesComponent>(nextCharacter, 'Attributes');
+          const pos = world.getComponent<PositionComponent>(nextCharacter, 'Position');
+          
+          // Check if character can afford Move (15 AP)
+          const canAffordMove = gridControllerRef.current.canAffordAction(nextCharacter, 'Move');
+          
+          if (canAffordMove && attrs && pos) {
+            // Default to Move: calculate and show valid moves
+            const moves = movementSystem.getValidMoves(world, grid, nextCharacter, { x: pos.x, y: pos.y }, attrs.mov);
+            updateValidMoves(moves);
+          } else {
+            // Default to Pass: clear moves
+            setValidMoves([]);
+          }
+          showStatus('Turn passed', 'info');
+        }
+      } else {
+        updateSelectedCharacter(null);
+        setValidMoves([]);
+      }
+    }
+    
+    setSelectedObject(null);
+    setTick(t => t + 1);
+  };
+
   // Reset systems and start round when scenario/mission changes
   React.useEffect(() => {
     // Initialize for both job mode (currentScenarioIndex) and random/mission mode (activeMission)
     if (world && grid) {
       gridControllerRef.current.reset();
       // Start first round
-      gridControllerRef.current.startRound(getPlayerCharacters, world);
+      gridControllerRef.current.startRound(getAllCharacters, world);
       const round = gridControllerRef.current.getCurrentRound();
       const activeChar = gridControllerRef.current.getCurrentActiveCharacter();
       console.log('[ScenarioView] Round started:', round, 'Active character:', activeChar);
@@ -61,24 +233,32 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
       setSelectedObject(null);
       setValidPushDirections([]);
       
-      // Auto-select first character and default to Move or Pass
+      // Auto-select first character and default to Move or Pass (or execute AI if NPC)
       if (activeChar !== null && grid) {
-        updateSelectedCharacter(activeChar);
-        const attrs = world.getComponent<AttributesComponent>(activeChar, 'Attributes');
-        const pos = world.getComponent<PositionComponent>(activeChar, 'Position');
+        const isNPC = world.getComponent<NPCComponent>(activeChar, 'NPC') !== undefined;
         
-        // Check if character can afford Move (15 AP)
-        const canAffordMove = gridControllerRef.current.canAffordAction(activeChar, 'Move');
-        
-        if (canAffordMove && attrs && pos) {
-          // Default to Move: calculate and show valid moves
-          const moves = movementSystem.getValidMoves(world, grid, activeChar, { x: pos.x, y: pos.y }, attrs.mov);
-          updateValidMoves(moves);
-          console.log('[ScenarioView] Auto-selected character, defaulting to Move action');
+        if (isNPC) {
+          // NPC turn - execute AI
+          setTimeout(() => executeNPCTurn(activeChar), 100);
         } else {
-          // Default to Pass: clear moves (Pass will be the only available action)
-          setValidMoves([]);
-          console.log('[ScenarioView] Auto-selected character, defaulting to Pass action (insufficient AP for Move)');
+          // Player character - auto-select and default to Move or Pass
+          updateSelectedCharacter(activeChar);
+          const attrs = world.getComponent<AttributesComponent>(activeChar, 'Attributes');
+          const pos = world.getComponent<PositionComponent>(activeChar, 'Position');
+          
+          // Check if character can afford Move (15 AP)
+          const canAffordMove = gridControllerRef.current.canAffordAction(activeChar, 'Move');
+          
+          if (canAffordMove && attrs && pos) {
+            // Default to Move: calculate and show valid moves
+            const moves = movementSystem.getValidMoves(world, grid, activeChar, { x: pos.x, y: pos.y }, attrs.mov);
+            updateValidMoves(moves);
+            console.log('[ScenarioView] Auto-selected character, defaulting to Move action');
+          } else {
+            // Default to Pass: clear moves (Pass will be the only available action)
+            setValidMoves([]);
+            console.log('[ScenarioView] Auto-selected character, defaulting to Pass action (insufficient AP for Move)');
+          }
         }
       } else {
         setSelectedCharacter(null);
@@ -392,74 +572,6 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     }, 100);
   };
 
-  // Handle Pass button click
-  const handlePass = () => {
-    const currentActiveCharacter = gridControllerRef.current.getCurrentActiveCharacter();
-    if (currentActiveCharacter === null) {
-      showStatus('No active character', 'error');
-      return;
-    }
-
-    const roundComplete = gridControllerRef.current.passTurn();
-    
-    if (roundComplete) {
-      // Round completed - start next round
-      gridControllerRef.current.startRound(getPlayerCharacters, world);
-      setCurrentRound(gridControllerRef.current.getCurrentRound());
-      showStatus('Round complete! Starting next round...', 'success', SUCCESS_MESSAGE_DURATION_MS);
-      
-      // Auto-select first character of new round
-      const nextActiveChar = gridControllerRef.current.getCurrentActiveCharacter();
-      if (nextActiveChar !== null && grid) {
-        updateSelectedCharacter(nextActiveChar);
-        const attrs = world.getComponent<AttributesComponent>(nextActiveChar, 'Attributes');
-        const pos = world.getComponent<PositionComponent>(nextActiveChar, 'Position');
-        
-        // Check if character can afford Move (15 AP)
-        const canAffordMove = gridControllerRef.current.canAffordAction(nextActiveChar, 'Move');
-        
-        if (canAffordMove && attrs && pos) {
-          // Default to Move: calculate and show valid moves
-          const moves = movementSystem.getValidMoves(world, grid, nextActiveChar, { x: pos.x, y: pos.y }, attrs.mov);
-          updateValidMoves(moves);
-        } else {
-          // Default to Pass: clear moves
-          setValidMoves([]);
-        }
-      } else {
-        updateSelectedCharacter(null);
-        setValidMoves([]);
-      }
-    } else {
-      // Next character's turn - auto-select and default to Move or Pass
-      const nextCharacter = gridControllerRef.current.getCurrentActiveCharacter();
-      if (nextCharacter !== null && grid) {
-        updateSelectedCharacter(nextCharacter);
-        const attrs = world.getComponent<AttributesComponent>(nextCharacter, 'Attributes');
-        const pos = world.getComponent<PositionComponent>(nextCharacter, 'Position');
-        
-        // Check if character can afford Move (15 AP)
-        const canAffordMove = gridControllerRef.current.canAffordAction(nextCharacter, 'Move');
-        
-        if (canAffordMove && attrs && pos) {
-          // Default to Move: calculate and show valid moves
-          const moves = movementSystem.getValidMoves(world, grid, nextCharacter, { x: pos.x, y: pos.y }, attrs.mov);
-          updateValidMoves(moves);
-        } else {
-          // Default to Pass: clear moves
-          setValidMoves([]);
-        }
-        showStatus('Turn passed', 'info');
-      } else {
-        updateSelectedCharacter(null);
-        setValidMoves([]);
-      }
-    }
-    
-    setSelectedObject(null);
-    setTick(t => t + 1);
-  };
-
   // Handle action button click (from action dropdown/buttons)
   const handleActionClick = (actionName: string, targetId?: number) => {
     const currentActiveCharacter = gridControllerRef.current.getCurrentActiveCharacter();
@@ -553,6 +665,25 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
     return undefined;
   };
 
+  // Get allowFleeing config from active scenario
+  const getAllowFleeing = (): boolean => {
+    if (activeJob && currentScenarioIndex !== undefined) {
+      const scenario = activeJob.scenarios[currentScenarioIndex];
+      if (scenario.minigameType === 'combat' && scenario.config) {
+        const config = scenario.config as { allowFleeing?: boolean };
+        return config.allowFleeing === true;
+      }
+    }
+    return false;
+  };
+
+  // Handle Flee button click - end scenario as 'fled' and return to town
+  const handleFlee = () => {
+    setView('TOWN');
+    showStatus('Fled from combat. Returned to town.', 'info', 2000);
+    // Note: Fleeing doesn't complete the mission, just returns to town
+  };
+
   // @deprecated - Old phase-based handlers removed (no longer used with AP system)
 
   return (
@@ -612,6 +743,9 @@ export const ScenarioView: React.FC<ScenarioViewProps> = ({ activeMission, onCom
         onPass={handlePass}
         scenarioType={getScenarioType()}
         onAbandon={handleAbandon}
+        allowFleeing={getAllowFleeing()}
+        onFlee={handleFlee}
+        getTurnOrder={() => gridControllerRef.current.getCharacterTurnOrder()}
       />
     </div>
   );

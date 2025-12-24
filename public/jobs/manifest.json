@@ -11,6 +11,12 @@
       "name": "Movement Test Job",
       "description": "Simple scenario for testing movement mechanics - minimal obstacles",
       "file": "movement-test-job.json"
+    },
+    {
+      "id": "combat-test-job",
+      "name": "Combat Test Job",
+      "description": "Test job for combat mechanics - NPCs that attack players",
+      "file": "combat-test-job.json"
     }
   ]
 }

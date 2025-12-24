@@ -45,18 +45,18 @@ export abstract class GridMiniGame extends BaseMiniGame {
     }
 
     // Start the first round - GridController manages its own state
-    // We need to provide a function to get player characters
-    const getPlayerCharacters = (): number[] => {
+    // We need to provide a function to get all characters (players + NPCs)
+    const getAllCharacters = (): number[] => {
       const entities = this.world.getAllEntities();
       return entities.filter(id => {
-        // Check if entity has PlayerControlled component or Attributes component
-        // For now, we'll assume all entities with Attributes are player characters
+        // Include all entities with Attributes component (players and NPCs)
+        // Both players and NPCs have Attributes, Stats, and either PlayerControlled or NPC component
         const attrs = this.world.getComponent(id, 'Attributes');
         return attrs !== undefined;
       });
     };
 
-    this.gridController.startRound(getPlayerCharacters, this.world);
+    this.gridController.startRound(getAllCharacters, this.world);
 
     this.setInitialized(true);
   }

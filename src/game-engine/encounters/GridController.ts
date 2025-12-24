@@ -131,12 +131,12 @@ export class GridController {
    * Start a new round by ordering characters by MOV and setting first as active
    * Resets AP for the first character to 50
    * 
-   * @param getPlayerCharacters - Function that returns array of player character IDs
+   * @param getAllCharacters - Function that returns array of all character IDs (players + NPCs)
    * @param world - The ECS world to access character attributes
    */
-  startRound(getPlayerCharacters: () => number[], world: World): void {
+  startRound(getAllCharacters: () => number[], world: World): void {
     // Order characters by MOV and set turn order
-    this.turnSystem.startRound(getPlayerCharacters, world);
+    this.turnSystem.startRound(getAllCharacters, world);
     
     // Reset AP for the first active character
     const firstCharacter = this.turnSystem.getCurrentActiveCharacter();
@@ -244,6 +244,23 @@ export class GridController {
         }
         return this.actionExecutionSystem.executeTurnAction(
           world,
+          characterId,
+          target,
+          this.apSystem
+        );
+
+      case 'Attack':
+        if (!target || typeof target !== 'number') {
+          return {
+            success: false,
+            action: { characterId, action: actionType },
+            error: 'Attack action requires target entity ID',
+            apRemaining: this.apSystem.getAP(characterId),
+          };
+        }
+        return this.actionExecutionSystem.executeAttackAction(
+          world,
+          grid,
           characterId,
           target,
           this.apSystem
@@ -464,6 +481,11 @@ export class GridController {
   // Push System Access
   getPushSystem(): PushSystem {
     return this.pushSystem;
+  }
+
+  // Action Point System Access
+  getAPSystem(): ActionPointSystem {
+    return this.apSystem;
   }
 
   // Reset all systems for a new encounter

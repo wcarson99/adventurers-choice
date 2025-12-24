@@ -101,12 +101,12 @@ export class GridController {
    * Start a new round by ordering characters by MOV and setting first as active
    * Resets AP for the first character to 50
    * 
-   * @param getPlayerCharacters - Function that returns array of player character IDs
+   * @param getAllCharacters - Function that returns array of all character IDs (players + NPCs)
    * @param world - The ECS world to access character attributes
    */
-  startRound(getPlayerCharacters: () => number[], world: World): void {
+  startRound(getAllCharacters: () => number[], world: World): void {
     // Order characters by MOV and set turn order
-    this.turnSystem.startRound(getPlayerCharacters, world);
+    this.turnSystem.startRound(getAllCharacters, world);
     
     // Reset AP for the first active character
     const firstCharacter = this.turnSystem.getCurrentActiveCharacter();

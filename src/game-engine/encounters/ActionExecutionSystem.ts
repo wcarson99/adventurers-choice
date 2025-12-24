@@ -1,6 +1,6 @@
 import { World } from '../ecs/World';
 import { Grid } from '../grid/Grid';
-import { PositionComponent, DirectionComponent } from '../ecs/Component';
+import { PositionComponent, DirectionComponent, AttributesComponent, StatsComponent } from '../ecs/Component';
 import { MovementSystem } from './MovementSystem';
 import { PushSystem } from './PushSystem';
 import { PlannedAction } from './EncounterStateManager';
@@ -292,6 +292,95 @@ export class ActionExecutionSystem {
     return {
       success: true,
       action: { characterId, action: 'Push', targetId },
+      apRemaining: remainingAP,
+    };
+  }
+
+  /**
+   * Execute an attack action immediately
+   * Deducts 20 AP from the attacker and deals PWR-based damage to the target
+   * 
+   * @param world - The ECS world
+   * @param grid - The grid
+   * @param characterId - The attacker character ID
+   * @param targetId - The target entity ID to attack
+   * @param apSystem - ActionPointSystem to deduct AP
+   * @returns Execution result with success status and remaining AP
+   */
+  executeAttackAction(
+    world: World,
+    grid: Grid,
+    characterId: number,
+    targetId: number,
+    apSystem: ActionPointSystem
+  ): ActionExecutionResult {
+    // Check if character can afford the attack
+    if (!apSystem.canAffordAction(characterId, ACTION_COSTS.ATTACK)) {
+      return {
+        success: false,
+        action: { characterId, action: 'Attack', targetId },
+        error: 'Insufficient AP to attack',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if attacker has position and attributes
+    const attackerPos = world.getComponent<PositionComponent>(characterId, 'Position');
+    const attackerAttrs = world.getComponent<AttributesComponent>(characterId, 'Attributes');
+    if (!attackerPos || !attackerAttrs) {
+      return {
+        success: false,
+        action: { characterId, action: 'Attack', targetId },
+        error: 'Attacker missing position or attributes',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if target exists and has position and stats
+    const targetPos = world.getComponent<PositionComponent>(targetId, 'Position');
+    const targetStats = world.getComponent<StatsComponent>(targetId, 'Stats');
+    if (!targetPos || !targetStats) {
+      return {
+        success: false,
+        action: { characterId, action: 'Attack', targetId },
+        error: 'Target missing position or stats',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if target is adjacent (Manhattan distance = 1)
+    const distance = grid.getDistance(attackerPos, targetPos);
+    if (distance !== 1) {
+      return {
+        success: false,
+        action: { characterId, action: 'Attack', targetId },
+        error: 'Target is not adjacent',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Check if target is still alive
+    if (targetStats.hp <= 0) {
+      return {
+        success: false,
+        action: { characterId, action: 'Attack', targetId },
+        error: 'Target is already defeated',
+        apRemaining: apSystem.getAP(characterId),
+      };
+    }
+
+    // Calculate damage based on attacker's PWR
+    const damage = attackerAttrs.pwr;
+
+    // Apply damage to target (reduce HP, but don't go below 0)
+    targetStats.hp = Math.max(0, targetStats.hp - damage);
+
+    // Deduct AP from attacker
+    const remainingAP = apSystem.deductAP(characterId, ACTION_COSTS.ATTACK);
+
+    return {
+      success: true,
+      action: { characterId, action: 'Attack', targetId },
       apRemaining: remainingAP,
     };
   }

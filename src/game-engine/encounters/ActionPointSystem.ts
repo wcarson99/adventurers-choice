@@ -84,6 +84,18 @@ export class ActionPointSystem {
   }
 
   /**
+   * Check if a character can afford an action by cost
+   * Generic method that accepts any action cost
+   * 
+   * @param characterId - The character ID
+   * @param cost - The AP cost of the action
+   * @returns True if character can afford the action
+   */
+  canAffordAction(characterId: number, cost: number): boolean {
+    return this.canAfford(characterId, cost);
+  }
+
+  /**
    * Reset all AP tracking (for new encounter)
    */
   reset(): void {

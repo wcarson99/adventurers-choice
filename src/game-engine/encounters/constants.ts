@@ -9,6 +9,7 @@ export const ACTION_COSTS = {
   PUSH: 25,
   TURN: 5,
   PASS: 0,
+  ATTACK: 20,
 } as const;
 
 /**

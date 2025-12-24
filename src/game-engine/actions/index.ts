@@ -4,5 +4,6 @@ export { MoveAction } from './MoveAction';
 export { PushAction } from './PushAction';
 export { TurnAction } from './TurnAction';
 export { PassAction } from './PassAction';
+export { AttackAction } from './AttackAction';
 export { ActionFactory } from './ActionFactory';
 

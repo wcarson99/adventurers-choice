@@ -1,0 +1,99 @@
+{
+  "id": "combat-test-job",
+  "name": "Combat Test Job",
+  "description": "Test job for combat mechanics - NPCs that attack players",
+  "scenarios": [
+    {
+      "id": "combat-test-scenario",
+      "name": "Combat Test Scenario",
+      "description": "Combat scenario with warrior and thief NPCs. Defeat all enemies to win!",
+      "minigameType": "combat",
+      "grid": {
+        "width": 6,
+        "height": 4
+      },
+      "entities": [
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 1 },
+          "properties": {
+            "name": "Hero 1",
+            "archetype": "Warrior",
+            "attributes": {
+              "pwr": 5,
+              "mov": 3,
+              "inf": 2,
+              "cre": 2
+            },
+            "sprite": "/assets/characters/warrior.png",
+            "gold": 20,
+            "food": 4
+          }
+        },
+        {
+          "type": "character",
+          "position": { "x": 0, "y": 2 },
+          "properties": {
+            "name": "Hero 2",
+            "archetype": "Wizard",
+            "attributes": {
+              "pwr": 3,
+              "mov": 2,
+              "inf": 5,
+              "cre": 4
+            },
+            "sprite": "/assets/characters/wizard.png",
+            "gold": 20,
+            "food": 4
+          }
+        },
+        {
+          "type": "npc",
+          "position": { "x": 5, "y": 1 },
+          "properties": {
+            "name": "Enemy Warrior",
+            "archetype": "Warrior",
+            "attributes": {
+              "pwr": 4,
+              "mov": 2,
+              "inf": 1,
+              "cre": 1
+            },
+            "sprite": "/assets/characters/warrior.png",
+            "maxHp": 15,
+            "stamina": 50,
+            "maxStamina": 50
+          }
+        },
+        {
+          "type": "npc",
+          "position": { "x": 5, "y": 2 },
+          "properties": {
+            "name": "Enemy Thief",
+            "archetype": "Thief",
+            "attributes": {
+              "pwr": 3,
+              "mov": 4,
+              "inf": 3,
+              "cre": 2
+            },
+            "sprite": "/assets/characters/thief.png",
+            "maxHp": 10,
+            "stamina": 50,
+            "maxStamina": 50
+          }
+        }
+      ],
+      "winConditions": [
+        {
+          "type": "allCharactersAlive",
+          "description": "Defeat all enemies"
+        }
+      ],
+      "config": {
+        "allowFleeing": true
+      }
+    }
+  ]
+}
+

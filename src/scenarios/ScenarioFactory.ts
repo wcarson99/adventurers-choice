@@ -6,6 +6,8 @@ import {
   AttributesComponent,
   PushableComponent,
   DirectionComponent,
+  NPCComponent,
+  StatsComponent,
 } from '../game-engine/ecs/Component';
 import type { ScenarioDefinition, EntityPlacement } from '../jobs/Job';
 import type { Character } from '../game-engine/GameState';
@@ -41,6 +43,10 @@ export class ScenarioFactory {
       switch (entity.type) {
         case 'character':
           this.createCharacter(world, entityId, entity, index, party);
+          break;
+        case 'npc':
+        case 'enemy':
+          this.createNPC(world, entityId, entity);
           break;
         case 'crate':
           this.createCrate(world, entityId, entity);
@@ -112,6 +118,63 @@ export class ScenarioFactory {
       dx: 1,
       dy: 0,
     } as DirectionComponent);
+  }
+
+  /**
+   * Create an NPC/enemy entity from job definition
+   */
+  private static createNPC(
+    world: World,
+    entityId: number,
+    entity: EntityPlacement
+  ): void {
+    const props = entity.properties;
+
+    // Validate required NPC properties
+    if (!props.name || !props.attributes) {
+      throw new Error(
+        `NPC entity missing required properties: name or attributes`
+      );
+    }
+
+    // Add renderable component with distinct color (red for enemies)
+    world.addComponent(entityId, {
+      type: 'Renderable',
+      char: props.name[0].toUpperCase(),
+      color: '#d32f2f', // Red for enemies/NPCs (distinct from player accent color)
+      sprite: props.sprite || '/assets/characters/warrior.png', // Default sprite, can be overridden
+    } as RenderableComponent);
+
+    // Add attributes component
+    world.addComponent(entityId, {
+      type: 'Attributes',
+      pwr: props.attributes.pwr,
+      mov: props.attributes.mov,
+      inf: props.attributes.inf,
+      cre: props.attributes.cre,
+    } as AttributesComponent);
+
+    // Add stats component with HP (default to 10 if not specified)
+    const maxHp = props.maxHp ?? 10;
+    world.addComponent(entityId, {
+      type: 'Stats',
+      hp: maxHp,
+      maxHp: maxHp,
+      stamina: props.stamina ?? 50,
+      maxStamina: props.maxStamina ?? 50,
+    } as StatsComponent);
+
+    // Add direction component (default facing right)
+    world.addComponent(entityId, {
+      type: 'Direction',
+      dx: 1,
+      dy: 0,
+    } as DirectionComponent);
+
+    // Add NPC component to mark this entity as an NPC
+    world.addComponent(entityId, {
+      type: 'NPC',
+    } as NPCComponent);
   }
 
   /**

@@ -204,12 +204,19 @@ export const ScenarioGrid: React.FC<ScenarioGridProps> = ({
                   {renderable.char}
                 </div>
               ) : null}
-              {/* Show direction indicator (red circle) */}
+              {/* Show direction indicator (green for players, red for NPCs) */}
               {entityId && (() => {
                 const direction = world.getComponent<DirectionComponent>(entityId, 'Direction');
                 if (!direction) return null;
                 
-                // Calculate position for the red circle based on direction
+                // Check if this is an NPC
+                const NPCComponent = world.getComponent(entityId, 'NPC');
+                const isNPC = NPCComponent !== undefined;
+                
+                // Green for players, red for NPCs
+                const dotColor = isNPC ? '#ff0000' : '#00ff00';
+                
+                // Calculate position for the circle based on direction
                 // Place it on the edge of the tile in the facing direction
                 const offsetX = direction.dx * 0.35; // 35% from center toward edge
                 const offsetY = direction.dy * 0.35;
@@ -223,7 +230,7 @@ export const ScenarioGrid: React.FC<ScenarioGridProps> = ({
                       transform: 'translate(-50%, -50%)',
                       width: '12px',
                       height: '12px',
-                      backgroundColor: '#ff0000',
+                      backgroundColor: dotColor,
                       borderRadius: '50%',
                       border: '2px solid #ffffff',
                       boxShadow: '0 0 4px rgba(0,0,0,0.5)',

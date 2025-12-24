@@ -1,6 +1,6 @@
 import React from 'react';
 import { World } from '../../../game-engine/ecs/World';
-import { AttributesComponent, PushableComponent, RenderableComponent } from '../../../game-engine/ecs/Component';
+import { AttributesComponent, PushableComponent, RenderableComponent, NPCComponent } from '../../../game-engine/ecs/Component';
 import { MovementPlan } from '../../../game-engine/encounters/MovementPlan';
 import { PlanningPhase } from '../../../game-engine/encounters/EncounterPhaseManager';
 import { PlannedAction } from '../../../game-engine/encounters/EncounterStateManager';
@@ -45,6 +45,11 @@ interface ScenarioInfoPanelProps {
   // Abandon button props
   scenarioType?: 'combat' | 'obstacle' | 'trading';
   onAbandon?: () => void;
+  // Flee button props
+  allowFleeing?: boolean;
+  onFlee?: () => void;
+  // Turn order props
+  getTurnOrder?: () => number[];
 }
 
 // Runtime check: This will fail if old code tries to import this module
@@ -89,6 +94,9 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
   onDirectionSelect: _onDirectionSelect,
   scenarioType,
   onAbandon,
+  allowFleeing,
+  onFlee,
+  getTurnOrder,
 }) => {
   // CRITICAL CHECK: Verify new code is running
   if (typeof window !== 'undefined' && !(window as any).__SCENARIO_INFO_PANEL_V2__) {
@@ -172,6 +180,101 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
           )}
         </div>
       )}
+
+      {/* Turn Order Display */}
+      {getTurnOrder && (() => {
+        const turnOrder = getTurnOrder();
+        if (turnOrder.length === 0) return null;
+        
+        const currentActive = getCurrentActiveCharacter ? getCurrentActiveCharacter() : null;
+        
+        return (
+          <div style={{
+            marginBottom: '0.75rem',
+            padding: '0.75rem',
+            backgroundColor: theme.colors.background,
+            borderRadius: '6px',
+            border: `1px solid ${theme.colors.imageBorder}`
+          }}>
+            <div style={{
+              fontSize: '0.85rem',
+              fontWeight: 'bold',
+              color: theme.colors.accent,
+              marginBottom: '0.5rem'
+            }}>
+              Turn Order
+            </div>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.25rem'
+            }}>
+              {turnOrder.map((charId, index) => {
+                const isActive = charId === currentActive;
+                const isNPC = world.getComponent<NPCComponent>(charId, 'NPC') !== undefined;
+                const attrs = world.getComponent<AttributesComponent>(charId, 'Attributes');
+                
+                // Get character name
+                let charName: string;
+                if (isNPC) {
+                  // For NPCs, get first letter from renderable char
+                  const renderable = world.getComponent<RenderableComponent>(charId, 'Renderable');
+                  const firstLetter = renderable?.char || 'E';
+                  // Try to infer name from first letter (E=Enemy, W=Warrior, T=Thief, etc.)
+                  const nameMap: { [key: string]: string } = {
+                    'E': 'Enemy',
+                    'W': 'Enemy Warrior',
+                    'T': 'Enemy Thief',
+                    'B': 'Enemy Bard',
+                    'C': 'Enemy Cleric',
+                    'P': 'Enemy Paladin',
+                    'Z': 'Enemy Wizard'
+                  };
+                  charName = nameMap[firstLetter] || `Enemy ${firstLetter}`;
+                } else {
+                  // For players, get from party array
+                  const charIndex = Array.from(world.getAllEntities()).indexOf(charId);
+                  charName = party[charIndex]?.name || `Character ${charIndex + 1}`;
+                }
+                
+                return (
+                  <div
+                    key={charId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.25rem 0.5rem',
+                      backgroundColor: isActive ? theme.colors.accent : 'transparent',
+                      color: isActive ? '#fff' : (isNPC ? '#ff6b6b' : theme.colors.text),
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: isActive ? 'bold' : 'normal'
+                    }}
+                  >
+                    <span style={{ width: '20px', textAlign: 'center' }}>
+                      {index + 1}.
+                    </span>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: isNPC ? '#ff0000' : '#00ff00',
+                      flexShrink: 0
+                    }} />
+                    <span style={{ flex: 1 }}>{charName}</span>
+                    {attrs && (
+                      <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                        MOV {attrs.mov}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Selected Character Info */}
       {selectedCharacter && !selectedObject && (() => {
@@ -448,6 +551,28 @@ export const ScenarioInfoPanel: React.FC<ScenarioInfoPanelProps> = ({
           }}
         >
           Abandon Scenario
+        </button>
+      )}
+
+      {/* Flee Button - Only visible for combat scenarios with allowFleeing=true */}
+      {scenarioType === 'combat' && allowFleeing && onFlee && (
+        <button
+          onClick={onFlee}
+          style={{
+            marginTop: 'auto',
+            padding: '0.75rem',
+            fontSize: '0.9rem',
+            fontWeight: 'bold',
+            backgroundColor: '#ff9800',
+            color: '#fff',
+            border: `2px solid ${theme.colors.imageBorder}`,
+            borderRadius: '6px',
+            cursor: 'pointer',
+            textAlign: 'center',
+            width: '100%'
+          }}
+        >
+          Flee
         </button>
       )}
     </div>
